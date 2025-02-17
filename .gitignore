@@ -1,3 +1,8 @@
+.idea/*
+.venv/*
+docs/*
+.vscode/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -160,4 +165,6 @@ cython_debug/
 #.idea/
 test.py
 test*.py
+!src/tests/**/**/test_*.py
+!src/tests/**/test_*.py
 .promptLib

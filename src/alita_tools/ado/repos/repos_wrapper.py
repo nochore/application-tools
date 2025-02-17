@@ -1,3 +1,4 @@
+import os
 import difflib
 import logging
 import re
@@ -22,6 +23,19 @@ from msrest.authentication import BasicAuthentication
 from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
 
 logger = logging.getLogger(__name__)
+
+
+class EnvVars(Enum):
+    ORGANIZATION_URL = "ADO_REPOS_ORGANIZATION_URL"
+    PROJECT = "ADO_REPOS_PROJECT"
+    REPOSITORY_ID = "ADO_REPOS_REPOSITORY_ID"
+    BASE_BRANCH = "ADO_REPOS_BASE_BRANCH"
+    ACTIVE_BRANCH = "ADO_REPOS_ACTIVE_BRANCH"
+    TOKEN = "ADO_REPOS_TOKEN"
+
+    def get_value(self):
+        """Utility method to fetch the environment variable for the enum value."""
+        return os.getenv(self.value)
 
 
 class GitChange:
@@ -115,13 +129,22 @@ class ArgsSchema(Enum):
     )
     UpdateFile = create_model(
         "UpdateFile",
-        branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(
+            str,
+            Field(description="The name of the branch, e.g. `my_branch`."),
+        ),
         file_path=(str, Field(description="Path of a file to be updated.")),
-        update_query=(str, Field(description="Update query used to adjust target file.")),
+        update_query=(
+            str,
+            Field(description="Update query used to adjust target file."),
+        ),
     )
     DeleteFile = create_model(
         "DeleteFile",
-        branch_name=(str, Field(description="The name of the branch, e.g. `my_branch`.")),
+        branch_name=(
+            str,
+            Field(description="The name of the branch, e.g. `my_branch`."),
+        ),
         file_path=(
             str,
             Field(
@@ -157,11 +180,12 @@ class ArgsSchema(Enum):
 
 
 class ReposApiWrapper(BaseModel):
-    organization_url: Optional[str]
-    project: Optional[str]
-    repository_id: Optional[str]
-    base_branch: Optional[str]
-    active_branch: Optional[str]
+    organization_url: Optional[str] = None
+    project: Optional[str] = None
+    repository_id: Optional[str] = None
+    base_branch: Optional[str] = None
+    active_branch: Optional[str] = None
+    token: str = ""
     _client: Optional[GitClient] = PrivateAttr()
 
     class Config:
@@ -175,7 +199,8 @@ class ReposApiWrapper(BaseModel):
         repository_id = values["repository_id"]
         base_branch = values["base_branch"]
         active_branch = values["active_branch"]
-        credentials = BasicAuthentication("", values["token"])
+        token = values["token"]
+        credentials = BasicAuthentication("", token)
 
         if not organization_url or not project or not repository_id:
             raise ToolException(
@@ -306,8 +331,7 @@ class ReposApiWrapper(BaseModel):
             if branches:
                 branches_str = "\n".join(branches)
                 return (
-                    f"Found {len(branches)} branches in the repository:"
-                    f"\n{branches_str}"
+                    f"Found {len(branches)} branches in the repository:\n{branches_str}"
                 )
             else:
                 return "No branches found in the repository"
@@ -604,7 +628,9 @@ class ReposApiWrapper(BaseModel):
             logger.error(msg)
             raise ToolException(msg)
 
-    def create_file(self, file_path: str, file_contents: str, branch_name: str = None) -> str:
+    def create_file(
+        self, file_path: str, file_contents: str, branch_name: str = None
+    ) -> str:
         """
         Creates a new file on the Azure DevOps repo
         Parameters:
@@ -994,6 +1020,25 @@ class ReposApiWrapper(BaseModel):
                 "args_schema": ArgsSchema.CreatePullRequest.value,
             },
         ]
+
+    @classmethod
+    def from_env(cls, **overrides):
+        env_values = {
+            "organization_url": EnvVars.ORGANIZATION_URL.get_value(),
+            "project": EnvVars.PROJECT.get_value(),
+            "repository_id": EnvVars.REPOSITORY_ID.get_value(),
+            "base_branch": EnvVars.BASE_BRANCH.get_value(),
+            "active_branch": EnvVars.ACTIVE_BRANCH.get_value(),
+            "token": EnvVars.TOKEN.get_value()
+        }
+
+        effective_values = {**env_values, **overrides}
+        
+        missing = [k for k, v in effective_values.items() if v is None]
+        if missing:
+            raise EnvironmentError(f"Missing essential configurations: {', '.join(missing)}")
+        
+        return cls(**effective_values)
 
     def run(self, mode: str, *args: Any, **kwargs: Any):
         """Run the tool based on the selected mode."""

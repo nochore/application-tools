@@ -2,3 +2,5 @@ pytest
 tiktoken==0.8.0
 langchain_community
 python-dotenv~=1.0.1
+pytest-env==1.1.5
+allure-pytest==2.13.5

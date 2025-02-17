@@ -25,3 +25,19 @@ dependencies = {file = ["requirements.txt"]}
 [project.urls]
 Homepage = "https://projectalita.ai"
 Issues = "https://github.com/ProjectAlita/application-tools/issues"
+
+[tool.pytest.ini_options]
+minversion = "8.3.4"
+addopts = "-v -ra -q -p no:warnings --ignore=src/alita_tools/ado/test_plan --rootdir=src --alluredir=allure-results"
+log_cli = true
+log_cli_level = "INFO"
+log_format = "%(asctime)s %(levelname)s %(message)s"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+filterwarnings = "ignore"
+cache_dir = ".pytest_cache"
+python_files = "test_*.py"
+python_functions = "test_"
+testpaths = [
+    "tests",
+    "tests/ado"
+]
