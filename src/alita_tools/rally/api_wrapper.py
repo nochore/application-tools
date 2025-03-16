@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic.fields import PrivateAttr
 from langchain_core.tools import ToolException
 
+from ..elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 create_entity_field = """JSON of the artifact fields to create in Rally, i.e. for `Defect`
@@ -35,10 +37,10 @@ update_entity_field = """JSON of the artifact fields to update in Rally, i.e.
 # Input models for Rally operations
 RallyGetEntities = create_model(
     "RallyGetStoriesModel",
-    entity_type=(str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'")),
-    query=(str, Field(description="Query for searching Rally stories", default=None)),
-    fetch=(bool, Field(description="Whether to fetch the full details of the stories", default=True)),
-    limit=(int, Field(description="Limit the number of results", default=10))
+    entity_type=(Optional[str], Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default="UserStory")),
+    query=(Optional[str], Field(description="Query for searching Rally stories", default=None)),
+    fetch=(Optional[bool], Field(description="Whether to fetch the full details of the stories", default=True)),
+    limit=(Optional[int], Field(description="Limit the number of results", default=10))
 )
 
 RallyGetProject = create_model(
@@ -58,7 +60,8 @@ RallyGetWorkspace = create_model(
 RallyGetUser = create_model(
     "RallyGetUserModel",
     user_name=(Optional[str], Field(
-        description="Username of the user to retrieve or default one will be used in case it is not passed"))
+        description="Username of the user to retrieve or default one will be used in case it is not passed",
+        default=None))
 )
 
 RallyNoInputModel = create_model(
@@ -68,19 +71,19 @@ RallyNoInputModel = create_model(
 RallyCreateArtifact = create_model(
     "RallyCreateArtifactModel",
     entity_json=(str, Field(description=create_entity_field)),
-    entity_type=(str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'"))
+    entity_type=(Optional[str], Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default='HierarchicalRequirement'))
 )
 
 RallyUpdateArtifact = create_model(
     "RallyUpdateArtifactModel",
     entity_json=(str, Field(description=update_entity_field)),
     entity_type=(
-        str, Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default=None))
+        Optional[str], Field(description="Artifact type, e.g. 'HierarchicalRequirement', 'Defect', 'UserStory'", default=None))
 )
 
 
 # Toolkit API wrapper
-class RallyApiWrapper(BaseModel):
+class RallyApiWrapper(BaseToolApiWrapper):
     server: str
     api_key: Optional[str] = None
     username: Optional[str] = None
@@ -280,10 +283,3 @@ class RallyApiWrapper(BaseModel):
                 "ref": self.update_entity,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """Run the tool based on the selected mode."""
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        raise ValueError(f"Unknown mode: {mode}")

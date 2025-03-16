@@ -2,10 +2,12 @@ from typing import Optional, Dict, Any, Union
 
 import boto3
 from botocore.config import Config
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
+
+from ...elitea_base import BaseToolApiWrapper
 
 
-class AWSToolConfig(BaseModel):
+class AWSToolConfig(BaseToolApiWrapper):
     region: str
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
@@ -26,7 +28,7 @@ class AWSToolConfig(BaseModel):
         )
         return values
 
-    def execute_aws(self, query: Union[str, Dict[str, Any]] = None):
+    def execute_aws(self, query: Union[str, Dict[str, Any]]):
         """Execute AWS service method based on the provided query"""
         loaded = self.json_query_load(query)
         if 'service' in loaded:

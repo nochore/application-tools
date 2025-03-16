@@ -3,11 +3,13 @@ from typing import Any, Optional, List, Dict
 
 from google.auth.transport.requests import Request
 from google.oauth2.service_account import Credentials
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
+from pydantic import Field, PrivateAttr, model_validator, create_model
 from requests import Session
 
+from ...elitea_base import BaseToolApiWrapper
 
-class GCPApiWrapper(BaseModel):
+
+class GCPApiWrapper(BaseToolApiWrapper):
     api_key: str
     _credentials: Optional[Credentials] = PrivateAttr()
     _session: Optional[Session] = PrivateAttr()
@@ -66,14 +68,7 @@ class GCPApiWrapper(BaseModel):
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
                     scopes=(List[str], Field(description="List of OAuth 2.0 Scopes for Google APIs.")),
                     url=(str, Field(description="Absolute URI for Google Cloud REST API.")),
-                    optional_args=(Optional[Dict[str, Any]], Field(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'."))
+                    optional_args=(Optional[Dict[str, Any]], Field(description="Optional JSON object to be sent in request with possible keys: 'data', 'json', 'params', 'headers'.", default=None))
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

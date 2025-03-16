@@ -1,12 +1,13 @@
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from langchain_core.tools import ToolException
 from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
 
 from .utils import read_docx_from_bytes
+from ..elitea_base import BaseToolApiWrapper
 
 NoInput = create_model(
     "NoInput"
@@ -15,13 +16,13 @@ NoInput = create_model(
 ReadList = create_model(
     "ReadList",
     list_title=(str, Field(description="Name of a Sharepoint list to be read.")),
-    limit=(int, Field(description="Limit (maximum number) of list items to be returned"))
+    limit=(Optional[int], Field(description="Limit (maximum number) of list items to be returned", default=1000))
 )
 
 GetFiles = create_model(
     "GetFiles",
-    folder_name=(str, Field(description="Folder name to get list of the files.")),
-    limit_files=(int, Field(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example 'Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER")),
+    folder_name=(Optional[str], Field(description="Folder name to get list of the files.", default=None)),
+    limit_files=(Optional[int], Field(description="Limit (maximum number) of files to be returned. Can be called with synonyms, such as First, Top, etc., or can be reflected just by a number for example 'Top 10 files'. Use default value if not specified in a query WITH NO EXTRA CONFIRMATION FROM A USER", default=100)),
 )
 
 ReadDocument = create_model(
@@ -30,7 +31,7 @@ ReadDocument = create_model(
 )
 
 
-class SharepointApiWrapper(BaseModel):
+class SharepointApiWrapper(BaseToolApiWrapper):
     site_url: str
     client_id: str = None
     client_secret: str = None
@@ -160,10 +161,3 @@ class SharepointApiWrapper(BaseModel):
                 "ref": self.read_file
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

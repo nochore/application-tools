@@ -1,13 +1,15 @@
-from typing import Any, Optional, List, Dict, Union
+from typing import Any, Optional, Dict, Union
 
-from pydantic import BaseModel, model_validator, create_model, Field, PrivateAttr
+import requests
 from azure.identity import ClientSecretCredential
 from azure.mgmt.resource import ResourceManagementClient
-import requests
+from pydantic import model_validator, create_model, Field, PrivateAttr
+
+from ...elitea_base import BaseToolApiWrapper
 
 ERROR_PREFIX = 'Error:'
 
-class AzureApiWrapper(BaseModel):
+class AzureApiWrapper(BaseToolApiWrapper):
     subscription_id: str
     tenant_id: str
     client_id: str
@@ -73,7 +75,7 @@ class AzureApiWrapper(BaseModel):
                     "ExecuteModel",
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.). Required parameter.")),
                     url=(str, Field(description="Required parameter: always has FQDN part and protocol for Azure Resource Management REST API.")),
-                    optional_args=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.")),
+                    optional_args=(Optional[Union[str, Dict[str, Any]]], Field(description="Optional, valid json ONLY! No comments allowed. JSON object to be sent in request with possible keys: 'data', 'headers', 'files'.", default=None)),
                 ),
                 "ref": self.execute,
             },
@@ -86,10 +88,3 @@ class AzureApiWrapper(BaseModel):
                 "ref": self.azure_integration_healthcheck,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

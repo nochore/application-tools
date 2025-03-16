@@ -17,6 +17,7 @@ from .xray import get_tools as get_xray_cloud, XrayToolkit
 from .sharepoint import get_tools as get_sharepoint, SharepointToolkit
 from .qtest import get_tools as get_qtest, QtestToolkit
 from .zephyr_scale import get_tools as get_zephyr_scale, ZephyrScaleToolkit
+from .zephyr_enterprise import get_tools as get_zephyr_enterprise, ZephyrEnterpriseToolkit
 from .ado import get_tools as get_ado
 from .ado.repos import AzureDevOpsReposToolkit
 from .ado.test_plan import AzureDevOpsPlansToolkit
@@ -35,14 +36,18 @@ from .custom_open_api import OpenApiToolkit as CustomOpenApiToolkit
 from .elastic import ElasticToolkit
 from .keycloak import KeycloakToolkit
 from .localgit import AlitaLocalGitToolkit
-from .pandas import PandasToolkit
+from .pandas import get_tools as get_pandas, PandasToolkit
 from .azure_ai.search import AzureSearchToolkit, get_tools as get_azure_search
+from .figma import get_tools as get_figma, FigmaToolkit
+from .salesforce import get_tools as get_salesforce, SalesforceToolkit
 
 logger = logging.getLogger(__name__)
 
-def get_tools(tools_list, *args, **kwargs):
+def get_tools(tools_list, alita: 'AlitaClient', llm: 'LLMLikeObject', *args, **kwargs):
     tools = []
     for tool in tools_list:
+        tool['settings']['alita'] = alita
+        tool['settings']['llm'] = llm
         if tool['type'] == 'openapi':
             tools.extend(get_openapi(tool))
         elif tool['type'] == 'github':
@@ -67,7 +72,7 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_bitbucket(tool))
         elif tool['type'] == 'testrail':
             tools.extend(get_testrail(tool))
-        elif tool['type'] in ['ado_boards', 'ado_wiki', 'ado_plans', 'ado_repos']:
+        elif tool['type'] in ['ado_boards', 'ado_wiki', 'ado_plans', 'ado_repos', 'azure_devops_repos']:
             tools.extend(get_ado(tool['type'], tool))
         elif tool['type'] == 'testio':
             tools.extend(get_testio(tool))
@@ -79,6 +84,8 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_qtest(tool))
         elif tool['type'] == 'zephyr_scale':
             tools.extend(get_zephyr_scale(tool))
+        elif tool['type'] == 'zephyr_enterprise':
+            tools.extend(get_zephyr_enterprise(tool))
         elif tool['type'] == 'rally':
             tools.extend(get_rally(tool))
         elif tool['type'] == 'sql':
@@ -89,6 +96,12 @@ def get_tools(tools_list, *args, **kwargs):
             tools.extend(get_google_places(tool))
         elif tool['type'] == 'azure_search':
             tools.extend(get_azure_search(tool))
+        elif tool['type'] == 'pandas':
+            tools.extend(get_pandas(tool))
+        elif tool['type'] == 'figma':
+            tools.extend(get_figma(tool))
+        elif tool['type'] == 'salesforce':
+            tools.extend(get_salesforce(tool))
         else:
             if tool.get("settings", {}).get("module"):
                 try:
@@ -123,6 +136,7 @@ def get_toolkits():
         AlitaBitbucketToolkit.toolkit_config_schema(),
         AlitaGitlabSpaceToolkit.toolkit_config_schema(),
         ZephyrScaleToolkit.toolkit_config_schema(),
+        ZephyrEnterpriseToolkit.toolkit_config_schema(),
         ZephyrToolkit.toolkit_config_schema(),
         AlitaYagmailToolkit.toolkit_config_schema(),
         SharepointToolkit.toolkit_config_schema(),
@@ -137,4 +151,7 @@ def get_toolkits():
         AlitaLocalGitToolkit.toolkit_config_schema(),
         PandasToolkit.toolkit_config_schema(),
         AzureSearchToolkit.toolkit_config_schema(),
+        FigmaToolkit.toolkit_config_schema(),
+        SalesforceToolkit.toolkit_config_schema(),
+
     ]

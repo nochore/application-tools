@@ -1,14 +1,16 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, create_model, Field, field_validator, PrivateAttr
 import googlemaps
+from pydantic import create_model, Field, field_validator, PrivateAttr
+
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: review langchain-google-community: places_api.py
-class GooglePlacesAPIWrapper(BaseModel):
+class GooglePlacesAPIWrapper(BaseToolApiWrapper):
     api_key: Optional[str] = None
     results_count: Optional[int] = None
     _client: Optional[googlemaps.Client] = PrivateAttr()
@@ -103,14 +105,7 @@ class GooglePlacesAPIWrapper(BaseModel):
                     current_location_query=(
                     str, Field(description="Detailed user query of current user location or where to start from")),
                     target=(str, Field(description="The target location or query which user wants to find")),
-                    radius=(Optional[int], Field(description="The radius of the search. This is optional field"))
+                    radius=(Optional[int], Field(description="The radius of the search. This is optional field", default=3000))
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

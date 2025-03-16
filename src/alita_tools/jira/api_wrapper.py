@@ -1,13 +1,16 @@
+import json
 import logging
 import re
 import traceback
 from json import JSONDecodeError
 from traceback import format_exc
-import json
 from typing import List, Optional, Any, Dict
-from langchain_core.tools import ToolException
-from pydantic import BaseModel, Field, PrivateAttr, model_validator, create_model
+
 from atlassian import Jira
+from langchain_core.tools import ToolException
+from pydantic import Field, PrivateAttr, model_validator, create_model
+
+from ..elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +82,8 @@ AddCommentInput = create_model(
 ModifyLabels = create_model(
     "AddCommentInputModel",
     issue_key=(str, Field(description="The issue key of the Jira issue to which the comment is to be added, e.g. 'TEST-123'.")),
-    add_labels=(list[str], Field(description="List of labels required to be added", default=None)),
-    remove_labels=(list[str], Field(description="List of labels required to be removed", default=None))
+    add_labels=(Optional[list[str]], Field(description="List of labels required to be added", default=None)),
+    remove_labels=(Optional[list[str]], Field(description="List of labels required to be removed", default=None))
 )
 
 SetIssueStatus = create_model(
@@ -231,7 +234,7 @@ def process_search_response(jira_url, response, payload_params: Dict[str, Any] =
     return str(processed_issues)
 
 
-class JiraApiWrapper(BaseModel):
+class JiraApiWrapper(BaseToolApiWrapper):
     base_url: str
     api_version: Optional[str] = "2",
     api_key: Optional[str] = None,
@@ -667,10 +670,3 @@ class JiraApiWrapper(BaseModel):
                 "args_schema": JiraInput,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

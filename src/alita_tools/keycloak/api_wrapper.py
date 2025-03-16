@@ -3,7 +3,10 @@ from pydantic import BaseModel, model_validator, create_model, Field, PrivateAtt
 import requests
 import json
 
-class KeycloakApiWrapper(BaseModel):
+from ..elitea_base import BaseToolApiWrapper
+
+
+class KeycloakApiWrapper(BaseToolApiWrapper):
     base_url: str
     realm: str
     client_id: str
@@ -65,14 +68,7 @@ class KeycloakApiWrapper(BaseModel):
                     "ExecuteModel",
                     method=(str, Field(description="The HTTP method to use for the request (GET, POST, PUT, DELETE, etc.).")),
                     relative_url=(str, Field(description="The relative URL of the Keycloak Admin API to call, e.g. '/users'.")),
-                    params=(Optional[str], Field(description="Optional string dictionary of parameters to be sent in the query string or request body."))
+                    params=(Optional[str], Field(description="Optional string dictionary of parameters to be sent in the query string or request body.", default=""))
                 ),
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

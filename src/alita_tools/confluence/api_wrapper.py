@@ -3,14 +3,15 @@ import logging
 import re
 import traceback
 from json import JSONDecodeError
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable, Generator
 
 import requests
 from langchain_community.document_loaders.confluence import ContentFormat
 from langchain_core.documents import Document
 from langchain_core.tools import ToolException
 from markdownify import markdownify
-from pydantic import create_model, BaseModel, Field, model_validator
+from pydantic import create_model, Field, model_validator
+from pydantic.fields import PrivateAttr
 from tenacity import (
     before_sleep_log,
     retry,
@@ -18,62 +19,64 @@ from tenacity import (
     wait_exponential,
 )
 
+from ..elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 createPage = create_model(
     "createPage",
-    space=(str, Field(description="Confluence space that is used for page's creation", default=None)),
+    space=(Optional[str], Field(description="Confluence space that is used for page's creation", default=None)),
     title=(str, Field(description="Title of the page")),
     body=(str, Field(description="Body of the page")),
-    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
-    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    label=(str, Field(description="Page label (optional)", default=None)),
+    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    label=(Optional[str], Field(description="Page label (optional)", default=None)),
 )
 
 createPages = create_model(
     "createPages",
-    space=(str, Field(description="Confluence space that is used for pages creation", default=None)),
+    space=(Optional[str], Field(description="Confluence space that is used for pages creation", default=None)),
     pages_info=(str, Field(description="""JSON string containing information about page name and its content per syntax: [{"page1_name": "page1_content"}, {"page2_name": "page2_content"}]""")),
-    parent_id=(str, Field(description="Page parent id (optional)", default=None)),
-    status=(str, Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
+    parent_id=(Optional[str], Field(description="Page parent id (optional)", default=None)),
+    status=(Optional[str], Field(description="Page publishing option: 'current' for publish page, 'draft' to create draft.", default='current')),
 )
 
 deletePage = create_model(
     "deletePage",
-    page_id=(str, Field(description="Page id", default=None)),
-    page_title=(str, Field(description="Page title", default=None)),
+    page_id=(Optional[str], Field(description="Page id", default=None)),
+    page_title=(Optional[str], Field(description="Page title", default=None)),
 )
 
 updatePageById = create_model(
     "updatePageById",
     page_id=(str, Field(description="Page id")),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, Field(description="New page title", default=None)),
-    new_body=(str, Field(description="New page content", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(Optional[str], Field(description="New page title", default=None)),
+    new_body=(Optional[str], Field(description="New page content", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updatePageByTitle = create_model(
     "updatePageByTitle",
     page_title=(str, Field(description="Page title")),
-    representation=(str, Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
-    new_title=(str, Field(description="New page title", default=None)),
-    new_body=(str, Field(description="New page content", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    representation=(Optional[str], Field(description="Content representation format: storage for html, wiki for markdown", default='storage')),
+    new_title=(Optional[str], Field(description="New page title", default=None)),
+    new_body=(Optional[str], Field(description="New page content", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updatePages = create_model(
     "updatePages",
-    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
-    new_contents=(list, Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    page_ids=(Optional[list], Field(description="List of ids of pages to be updated", default=None)),
+    new_contents=(Optional[list], Field(description="List of new contents for each page. If content the same for all the pages then it should be a list with a single entry", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 updateLabels = create_model(
     "updateLabels",
-    page_ids=(list, Field(description="List of ids of pages to be updated", default=None)),
-    new_labels=(list, Field(description="Page labels", default=None)),
+    page_ids=(Optional[list], Field(description="List of ids of pages to be updated", default=None)),
+    new_labels=(Optional[list], Field(description="Page labels", default=None)),
 )
 
 getPageTree = create_model(
@@ -94,7 +97,7 @@ getPagesWithLabel = create_model(
 searchPages = create_model(
     "searchPages",
     query=(str, Field(description="Query text to search pages")),
-    skip_images=(bool, Field(description="Whether we need to skip existing images or not"))
+    skip_images=(Optional[bool], Field(description="Whether we need to skip existing images or not", default=False))
 )
 
 siteSearch = create_model(
@@ -105,7 +108,7 @@ siteSearch = create_model(
 pageId = create_model(
     "pageId",
     page_id=(str, Field(description="Id of page to be read")),
-    skip_images=(bool, Field(description="Whether we need to skip existing images or not")),
+    skip_images=(Optional[bool], Field(description="Whether we need to skip existing images or not", default=False)),
 )
 
 сonfluenceInput = create_model(
@@ -114,6 +117,25 @@ pageId = create_model(
      relative_url=(str, Field(description="Required parameter: The relative URI for Confluence API. URI must start with a forward slash and '/rest/...'. Do not include query parameters in the URL, they must be provided separately in 'params'.")),
      params=(Optional[str], Field(default="", description="Optional JSON of parameters to be sent in request body or query params. MUST be string with valid JSON. For search/read operations, you MUST always get minimum fields and set max results, until users ask explicitly for more fields. For search/read operations you must generate CQL query string and pass it as params."))
  )
+
+loaderParams = create_model(
+    "LoaderParams",
+    content_format=(str, Field(description="The format of the content to be retrieved.")),
+    page_ids=(Optional[List[str]], Field(description="List of page IDs to retrieve.", default=None)),
+    label=(Optional[str], Field(description="Label to filter pages.", default=None)),
+    cql=(Optional[str], Field(description="CQL query to filter pages.", default=None)),
+    include_restricted_content=(Optional[bool], Field(description="Include restricted content.", default=False)),
+    include_archived_content=(Optional[bool], Field(description="Include archived content.", default=False)),
+    include_attachments=(Optional[bool], Field(description="Include attachments.", default=False)),
+    include_comments=(Optional[bool], Field(description="Include comments.", default=False)),
+    include_labels=(Optional[bool], Field(description="Include labels.", default=False)),
+    limit=(Optional[int], Field(description="Limit the number of results.", default=10)),
+    max_pages=(Optional[int], Field(description="Maximum number of pages to retrieve.", default=1000)),
+    ocr_languages=(Optional[str], Field(description="OCR languages for processing attachments.", default=None)),
+    keep_markdown_format=(Optional[bool], Field(description="Keep the markdown format.", default=True)),
+    keep_newlines=(Optional[bool], Field(description="Keep newlines in the content.", default=True)),
+    bins_with_llm=(Optional[bool], Field(description="Use LLM for processing binary files.", default=False)),
+)
 
 
 def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
@@ -125,8 +147,8 @@ def parse_payload_params(params: Optional[str]) -> Dict[str, Any]:
             return ToolException(f"Confluence tool exception. Passed params are not valid JSON. {stacktrace}")
     return {}
 
-class ConfluenceAPIWrapper(BaseModel):
-    client: Any #: :meta private:
+class ConfluenceAPIWrapper(BaseToolApiWrapper):
+    _client: Any = PrivateAttr()
     base_url: str
     api_key: Optional[str] = None,
     username: Optional[str] = None
@@ -145,6 +167,8 @@ class ConfluenceAPIWrapper(BaseModel):
     keep_markdown_format: Optional[bool] = True
     ocr_languages: Optional[str] = None
     keep_newlines: Optional[bool] = True
+    alita: Any = None
+    llm: Any = None
 
     @model_validator(mode='before')
     @classmethod
@@ -163,9 +187,9 @@ class ConfluenceAPIWrapper(BaseModel):
         token = values.get('token')
         cloud = values.get('cloud')
         if token:
-            values['client'] = Confluence(url=url, token=token, cloud=cloud)
+            cls._client = Confluence(url=url, token=token, cloud=cloud)
         else:
-            values['client'] = Confluence(url=url,username=username, password=api_key, cloud=cloud)
+            cls._client = Confluence(url=url,username=username, password=api_key, cloud=cloud)
         return values
 
     def __unquote_confluence_space(self) -> str | None:
@@ -192,13 +216,13 @@ class ConfluenceAPIWrapper(BaseModel):
         """ Creates a page in the Confluence space. Represents content in html (storage) or wiki (wiki) formats
             Page could be either published status='current' or make a draft with status='draft'
         """
-        if self.client.get_page_by_title(space=self.space, title=title) is not None:
+        if self._client.get_page_by_title(space=self.space, title=title) is not None:
             return f"Page with title {title} already exists, please use other title."
 
         # normal user flow: put pages in the Space Home, not in the root of the Space
         user_space = space if space else self.space
         logger.info(f"Page will be created within the space {user_space}")
-        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
+        parent_id_filled = parent_id if parent_id else self._client.get_space(user_space)['homepage']['id']
 
         created_page = self.temp_create_page(space=user_space, title=title, body=body, status=status, parent_id=parent_id_filled, representation=representation)
 
@@ -213,7 +237,7 @@ class ConfluenceAPIWrapper(BaseModel):
         logger.info(f"Page created: {page_details['link']}")
 
         if label:
-            self.client.set_page_label(page_id=created_page['id'], label=label)
+            self._client.set_page_label(page_id=created_page['id'], label=label)
             logger.info(f"Label '{label}' added to the page '{title}'.")
             page_details['label'] = label
 
@@ -225,7 +249,7 @@ class ConfluenceAPIWrapper(BaseModel):
         user_space = space if space else self.space
         logger.info(f"Pages will be created within the space {user_space}")
         # duplicate action to avoid extra api calls in downstream function
-        parent_id_filled = parent_id if parent_id else self.client.get_space(user_space)['homepage']['id']
+        parent_id_filled = parent_id if parent_id else self._client.get_space(user_space)['homepage']['id']
         for page_item in json.loads(pages_info):
             for title, body in page_item.items():
                 created_page = self.create_page(title=title, body=body, status=status, parent_id=parent_id_filled, space=user_space)
@@ -241,7 +265,7 @@ class ConfluenceAPIWrapper(BaseModel):
             "title": title,
             "status": status,
             "space": {"key": space},
-            "body": self.client._create_body(body, representation),
+            "body": self._client._create_body(body, representation),
             "metadata": {"properties": {}},
         }
         if parent_id:
@@ -255,15 +279,15 @@ class ConfluenceAPIWrapper(BaseModel):
             data["metadata"]["properties"]["content-appearance-draft"] = {"value": "fixed-width"}
             data["metadata"]["properties"]["content-appearance-published"] = {"value": "fixed-width"}
 
-        return self.client.post(url, data=data)
+        return self._client.post(url, data=data)
 
     def delete_page(self, page_id: str = None, page_title: str = None):
         """ Deletes a page by its defined page_id or page_title """
         if not page_id and not page_title:
             raise ValueError("Either page_id or page_title is required to delete the page")
-        resolved_page_id = page_id if page_id else (self.client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
+        resolved_page_id = page_id if page_id else (self._client.get_page_by_title(space=self.space, title=page_title) or {}).get('id')
         if resolved_page_id:
-            self.client.remove_page(resolved_page_id)
+            self._client.remove_page(resolved_page_id)
             message = f"Page with ID '{resolved_page_id}' has been successfully deleted."
         else:
             message = f"Page instance could not be resolved with id '{page_id}' and/or title '{page_title}'"
@@ -271,11 +295,11 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def update_page_by_id(self, page_id: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
-        current_page = self.client.get_page_by_id(page_id, expand='version,body.view')
+        current_page = self._client.get_page_by_id(page_id, expand='version,body.view')
         if not current_page:
             return f"Page with ID {page_id} not found."
 
-        if new_title and current_page['title'] != new_title and self.client.get_page_by_title(space=self.space, title=new_title):
+        if new_title and current_page['title'] != new_title and self._client.get_page_by_title(space=self.space, title=new_title):
             return f"Page with title {new_title} already exists."
 
         current_version = current_page['version']['number']
@@ -283,7 +307,7 @@ class ConfluenceAPIWrapper(BaseModel):
         body_to_use = new_body if new_body else current_page['body']['view']['value']
         representation_to_use = representation if representation else current_page['body']['view']['representation']
 
-        updated_page = self.client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
+        updated_page = self._client.update_page(page_id=page_id, title=title_to_use, body=body_to_use, representation=representation_to_use)
         webui_link = updated_page['_links']['base'] + updated_page['_links']['webui']
         logger.info(f"Page updated: {webui_link}")
 
@@ -302,11 +326,11 @@ class ConfluenceAPIWrapper(BaseModel):
         }
 
         if new_labels is not None:
-            current_labels = self.client.get_page_labels(page_id)
+            current_labels = self._client.get_page_labels(page_id)
             for label in current_labels['results']:
-                self.client.remove_page_label(page_id, label['name'])
+                self._client.remove_page_label(page_id, label['name'])
             for label in new_labels:
-                self.client.set_page_label(page_id, label)
+                self._client.set_page_label(page_id, label)
             logger.info(f"Labels updated for the page '{title_to_use}'.")
             update_details['labels'] = new_labels
 
@@ -314,7 +338,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def update_page_by_title(self, page_title: str, representation: str = 'storage', new_title: str = None, new_body: str = None, new_labels: list = None):
         """ Updates an existing Confluence page (using id or title) by replacing its content, title, labels """
-        current_page = self.client.get_page_by_title(space=self.space, title=page_title)
+        current_page = self._client.get_page_by_title(space=self.space, title=page_title)
         if not current_page:
             return f"Page with title {page_title} not found."
 
@@ -359,7 +383,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
 
         while True:
-            children = self.client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
+            children = self._client.get_page_child_by_type(page_id, type='page', start=start, limit=limit)
             if not children:
                 break
             for child in children:
@@ -372,7 +396,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def page_exists(self, title: str):
         """ Checks if a page exists in the Confluence space."""
-        status = self.client.page_exists(space=self.space, title=title)
+        status = self._client.page_exists(space=self.space, title=title)
         return status
 
     def get_pages_with_label(self, label: str):
@@ -389,7 +413,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
-            pages = self.client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
+            pages = self._client.get_all_pages_by_label(label, start=start, limit=self.limit) #, expand="body.view.value"
             if not pages:
                 break
 
@@ -404,7 +428,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
     def is_public_page(self, page: dict) -> bool:
         """Check if a page is publicly accessible."""
-        restrictions = self.client.get_all_restrictions_for_content(page["id"])
+        restrictions = self._client.get_all_restrictions_for_content(page["id"])
 
         return (
                 page["status"] == "current"
@@ -426,7 +450,7 @@ class ConfluenceAPIWrapper(BaseModel):
                     max=self.max_retry_seconds,  # type: ignore[arg-type]
                 ),
                 before_sleep=before_sleep_log(logger, logging.WARNING),
-            )(self.client.get_page_by_id)
+            )(self._client.get_page_by_id)
             page = get_page(
                 page_id=page_id, expand=f"{self.content_format.value},version"
             )
@@ -451,7 +475,7 @@ class ConfluenceAPIWrapper(BaseModel):
         start = 0
         pages_info = []
         for _ in range((self.max_pages + self.limit - 1) // self.limit):
-            pages = self.client.cql(cql, start=start, limit=self.limit).get("results", [])
+            pages = self._client.cql(cql, start=start, limit=self.limit).get("results", [])
             if not pages:
                 break
             page_ids = [page['content']['id'] for page in pages]
@@ -489,7 +513,7 @@ class ConfluenceAPIWrapper(BaseModel):
             cql = f'(type=page) and (siteSearch~"{query}")'
         else:
             cql = f'(type=page and space={self.__sanitize_confluence_space()}) and (siteSearch~"{query}")'
-        pages = self.client.cql(cql, start=0, limit=10).get("results", [])
+        pages = self._client.cql(cql, start=0, limit=10).get("results", [])
         if not pages:
             return f"Unable to find anything using query {query}"
         # extract id, title, url and preview text
@@ -541,7 +565,7 @@ class ConfluenceAPIWrapper(BaseModel):
                 ) + "".join(attachment_texts)
 
         if self.include_comments:
-            comments = self.client.get_page_comments(
+            comments = self._client.get_page_comments(
                 page["id"], expand="body.view.value", depth="all"
             )["results"]
             comment_texts = [
@@ -580,7 +604,7 @@ class ConfluenceAPIWrapper(BaseModel):
 
         # depending on setup you may also need to set the correct path for
         # poppler and tesseract
-        attachments = self.client.get_attachments_from_content(page_id)["results"]
+        attachments = self._client.get_attachments_from_content(page_id)["results"]
         texts = []
         for attachment in attachments:
             media_type = attachment["metadata"]["mediaType"]
@@ -620,7 +644,7 @@ class ConfluenceAPIWrapper(BaseModel):
         """Generic Confluence Tool for Official Atlassian Confluence REST API to call, searching, creating, updating pages, etc."""
         payload_params = parse_payload_params(params)
         if method == "GET":
-            response = self.client.request(
+            response = self._client.request(
                 method=method,
                 path=relative_url,
                 params=payload_params,
@@ -628,7 +652,7 @@ class ConfluenceAPIWrapper(BaseModel):
             )
             response_text = self.process_search_response(relative_url, response)
         else:
-            response = self.client.request(
+            response = self._client.request(
                 method=method,
                 path=relative_url,
                 data=payload_params,
@@ -645,6 +669,121 @@ class ConfluenceAPIWrapper(BaseModel):
             body = markdownify(response.text, heading_style="ATX")
             return body
         return response.text
+    
+    
+    def paginate_request(self, retrieval_method: Callable, **kwargs: Any) -> List:
+        """Paginate the various methods to retrieve groups of pages.
+
+        Unfortunately, due to page size, sometimes the Confluence API
+        doesn't match the limit value. If `limit` is >100 confluence
+        seems to cap the response to 100. Also, due to the Atlassian Python
+        package, we don't get the "next" values from the "_links" key because
+        they only return the value from the result key. So here, the pagination
+        starts from 0 and goes until the max_pages, getting the `limit` number
+        of pages with each request. We have to manually check if there
+        are more docs based on the length of the returned list of pages, rather than
+        just checking for the presence of a `next` key in the response like this page
+        would have you do:
+        https://developer.atlassian.com/server/confluence/pagination-in-the-rest-api/
+
+        :param retrieval_method: Function used to retrieve docs
+        :type retrieval_method: callable
+        :return: List of documents
+        :rtype: List
+        """
+
+        max_pages = kwargs.pop("max_pages")
+        docs: List[dict] = []
+        next_url: str = ""
+        while len(docs) < max_pages:
+            get_pages = retry(
+                reraise=True,
+                stop=stop_after_attempt(
+                    self.number_of_retries  # type: ignore[arg-type]
+                ),
+                wait=wait_exponential(
+                    multiplier=1,
+                    min=self.min_retry_seconds,  # type: ignore[arg-type]
+                    max=self.max_retry_seconds,  # type: ignore[arg-type]
+                ),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+            )(retrieval_method)
+            if self.cql:  # cursor pagination for CQL
+                batch, next_url = get_pages(**kwargs, next_url=next_url)
+                if not next_url:
+                    docs.extend(batch)
+                    break
+            else:
+                batch = get_pages(**kwargs, start=len(docs))
+                if not batch:
+                    break
+            docs.extend(batch)
+        return docs[:max_pages]
+    
+    def loader(self,
+            content_format: str,
+            page_ids: Optional[List[str]] = None,
+            label: Optional[str] = None,
+            cql: Optional[str] = None,
+            include_restricted_content: Optional[bool] = False,
+            include_archived_content: Optional[bool] = False,
+            include_attachments: Optional[bool] = False,
+            include_comments: Optional[bool] = False,
+            include_labels: Optional[bool] = False,
+            limit: Optional[int] = 10,
+            max_pages: Optional[int] = 10,
+            ocr_languages: Optional[str] = None,
+            keep_markdown_format: Optional[bool] = True,
+            keep_newlines: Optional[bool] = True,
+            bins_with_llm: bool = False,
+            **kwargs) -> Generator[str, None, None]:
+        """
+        Loads content from Confluence based on parameters.
+        Returns:
+            Generator: A generator that yields content of pages that match specified criteria
+        """
+        from .loader import AlitaConfluenceLoader
+        
+        content_formant = content_format.lower() if content_format else 'view'
+        mapping = {
+            'view': ContentFormat.VIEW,
+            'storage': ContentFormat.STORAGE,
+            'export_view': ContentFormat.EXPORT_VIEW,
+            'editor': ContentFormat.EDITOR,
+            'anonymous': ContentFormat.ANONYMOUS_EXPORT_VIEW
+        }
+        content_format = mapping.get(content_formant, ContentFormat.VIEW)
+        
+        confluence_loader_params = {
+            'url': self.base_url,
+            'space_key': self.space,
+            'page_ids': page_ids,
+            'label': label,
+            'cql': cql,
+            'include_restricted_content': include_restricted_content,
+            'include_archived_content': include_archived_content,
+            'include_attachments': include_attachments,
+            'include_comments': include_comments,
+            'include_labels': include_labels,
+            'content_format': content_format,
+            'limit': limit,
+            'max_pages': max_pages,
+            'ocr_languages': ocr_languages,
+            'keep_markdown_format': keep_markdown_format,
+            'keep_newlines': keep_newlines,
+            'min_retry_seconds': self.min_retry_seconds,
+            'max_retry_seconds': self.max_retry_seconds,
+            'number_of_retries': self.number_of_retries
+            
+        }
+        
+        loader = AlitaConfluenceLoader(self._client, self.llm, bins_with_llm, **confluence_loader_params)
+        
+        for document in loader._lazy_load(kwargs={}):
+            yield document
+
+
+        
 
     def get_available_tools(self):
         return [
@@ -743,12 +882,11 @@ class ConfluenceAPIWrapper(BaseModel):
                 "description": self.execute_generic_confluence.__doc__,
                 "args_schema": сonfluenceInput,
                 "ref": self.execute_generic_confluence,
+            },
+            {
+                "name": "loader",
+                "ref": self.loader,
+                "description": self.loader.__doc__,
+                "args_schema": loaderParams,
             }
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

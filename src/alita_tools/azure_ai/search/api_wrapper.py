@@ -5,6 +5,8 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from langchain_openai import AzureOpenAIEmbeddings
 
+from ...elitea_base import BaseToolApiWrapper
+
 logger = logging.getLogger(__name__)
 
 class AzureSearchInput(BaseModel):
@@ -13,11 +15,11 @@ class AzureSearchInput(BaseModel):
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document.")
 
 class AzureDocumentInput(BaseModel):
-    document_id: str = Field(..., description="The ID of the document to retrieve.")
+    document_id: str = Field(description="The ID of the document to retrieve.")
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document.")
 
 class TextSearchInput(BaseModel):
-    search_text: str = Field(..., description="The text to search for in the Azure Search index.")
+    search_text: str = Field(description="The text to search for in the Azure Search index.")
     limit: Optional[int] = Field(-1, description="The number of results to return (if no limit needed use -1).")
     order_by: Optional[List[str]] = Field(None, description="Ordering expression for the search results (if no order needed use empty list).")
     selected_fields: Optional[List[str]] = Field(None, description="The fields to retrieve from the document (if no fields needed use empty list).")
@@ -31,9 +33,9 @@ class HybridSearchInput(BaseModel):
     vectors: List[Dict[str, Any]] = Field(..., description="The vectors to search for in the Azure Search index.")
     limit: Optional[int] = Field(None, description="The number of results to return.")
 
-class AzureSearchApiWrapper(BaseModel):
-    _client: Any #: :meta private:
-    _AzureOpenAIClient: Any #: :meta private:
+class AzureSearchApiWrapper(BaseToolApiWrapper):
+    _client: Any = PrivateAttr()
+    _AzureOpenAIClient: Any = PrivateAttr()
     api_key: str
     endpoint: str
     index_name: str
@@ -162,18 +164,3 @@ class AzureSearchApiWrapper(BaseModel):
                 "args_schema": AzureDocumentInput,
             },
         ]
-
-    def run(self, mode: str, *args: Any, **kwargs: Any):
-        """
-        Run a specific tool based on the mode.
-
-        :param mode: The mode of the tool to run.
-        :param args: The arguments to pass to the tool.
-        :param kwargs: The keyword arguments to pass to the tool.
-        :return: The result of the tool execution.
-        """
-        for tool in self.get_available_tools():
-            if tool["name"] == mode:
-                return tool["ref"](*args, **kwargs)
-        else:
-            raise ValueError(f"Unknown mode: {mode}")

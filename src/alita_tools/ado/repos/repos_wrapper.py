@@ -4,7 +4,7 @@ import logging
 import re
 from enum import Enum
 from json import dumps
-from typing import Any, List, Union, Optional
+from typing import List, Union, Optional
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -20,7 +20,10 @@ from azure.devops.v7_0.git.models import (
 )
 from langchain_core.tools import ToolException
 from msrest.authentication import BasicAuthentication
-from pydantic import BaseModel, Field, PrivateAttr, create_model, model_validator
+from pydantic import Field, PrivateAttr, create_model, model_validator
+
+from ..utils import extract_old_new_pairs, generate_diff
+from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +80,7 @@ class ArgsSchema(Enum):
     ListFilesModel = create_model(
         "ListFilesModel",
         directory_path=(
-            str,
+            Optional[str],
             Field(
                 default="",
                 description=(
@@ -87,9 +90,9 @@ class ArgsSchema(Enum):
             ),
         ),
         branch_name=(
-            str,
+            Optional[str],
             Field(
-                default="",
+                default=None,
                 description=(
                     "Repository branch. If None then active branch will be selected."
                 ),
@@ -118,8 +121,8 @@ class ArgsSchema(Enum):
     CreateFile = create_model(
         "CreateFile",
         branch_name=(
-            str,
-            Field(description="The name of the branch, e.g. `my_branch`."),
+            Optional[str],
+            Field(description="The name of the branch, e.g. `my_branch`.", default=None),
         ),
         file_path=(str, Field(description="Path of a file to be created.")),
         file_contents=(
@@ -179,13 +182,12 @@ class ArgsSchema(Enum):
     )
 
 
-class ReposApiWrapper(BaseModel):
-    organization_url: Optional[str] = None
-    project: Optional[str] = None
-    repository_id: Optional[str] = None
-    base_branch: Optional[str] = None
-    active_branch: Optional[str] = None
-    token: str = ""
+class ReposApiWrapper(BaseToolApiWrapper):
+    organization_url: Optional[str]
+    project: Optional[str]
+    repository_id: Optional[str]
+    base_branch: Optional[str]
+    active_branch: Optional[str]
     _client: Optional[GitClient] = PrivateAttr()
 
     class Config:
@@ -209,6 +211,8 @@ class ReposApiWrapper(BaseModel):
 
         try:
             cls._client = GitClient(base_url=organization_url, creds=credentials)
+            # workaround to check if user is authorized to access ADO Git
+            cls._client.get_repository(repository_id, project=project)
         except Exception as e:
             raise ToolException(f"Failed to connect to Azure DevOps: {e}")
 
@@ -218,13 +222,15 @@ class ReposApiWrapper(BaseModel):
                     repository_id=repository_id, name=branch_name, project=project
                 )
                 return branch is not None
-            except Exception as e:
+            except Exception:
                 return False
 
-        if base_branch and not branch_exists(base_branch):
-            raise ToolException(f"The base branch '{base_branch}' does not exist.")
-        if active_branch and not branch_exists(active_branch):
-            raise ToolException(f"The active branch '{active_branch}' does not exist.")
+        if base_branch:
+            if not branch_exists(base_branch):
+                raise ToolException(f"The base branch '{base_branch}' does not exist.")
+        if active_branch:
+            if not branch_exists(active_branch):
+                raise ToolException(f"The active branch '{active_branch}' does not exist.")
 
         return values
 
@@ -262,31 +268,6 @@ class ReposApiWrapper(BaseModel):
             if item.git_object_type == "blob":
                 files.append(item.path)
         return str(files)
-
-    def extract_old_new_pairs(self, file_query: str):
-        """
-        Extracts old and new content pairs from a file query.
-        Parameters:
-            file_query (str): The file query containing old and new content.
-        Returns:
-            list of tuples: A list where each tuple contains (old_content, new_content).
-        """
-        old_pattern = re.compile(r"OLD <<<<\s*(.*?)\s*>>>> OLD", re.DOTALL)
-        new_pattern = re.compile(r"NEW <<<<\s*(.*?)\s*>>>> NEW", re.DOTALL)
-
-        old_contents = old_pattern.findall(file_query)
-        new_contents = new_pattern.findall(file_query)
-
-        return list(zip(old_contents, new_contents))
-
-    def generate_diff(self, base_text, target_text, file_path):
-        base_lines = base_text.splitlines(keepends=True)
-        target_lines = target_text.splitlines(keepends=True)
-        diff = difflib.unified_diff(
-            base_lines, target_lines, fromfile=f"a/{file_path}", tofile=f"b/{file_path}"
-        )
-
-        return "".join(diff)
 
     def set_active_branch(self, branch_name: str) -> str:
         """
@@ -538,7 +519,7 @@ class ReposApiWrapper(BaseModel):
             if change_type == "edit":
                 base_content = self.get_file_content(target_commit_id, path)
                 target_content = self.get_file_content(source_commit_id, path)
-                diff = self.generate_diff(base_content, target_content, path)
+                diff = generate_diff(base_content, target_content, path)
             else:
                 diff = f"Change Type: {change_type}"
 
@@ -766,7 +747,7 @@ class ReposApiWrapper(BaseModel):
             file_content = self.read_file(file_path)
 
             updated_file_content = file_content
-            for old, new in self.extract_old_new_pairs(update_query):
+            for old, new in extract_old_new_pairs(update_query):
                 if not old.strip():
                     continue
                 updated_file_content = updated_file_content.replace(old, new)
