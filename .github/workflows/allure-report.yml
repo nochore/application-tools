@@ -24,15 +24,12 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-venv-
 
-    - name: Create and activate virtual environment
+    - name: Create and activate virtual environment and install dependencies
       run: |
         python -m venv .venv
         . .venv/bin/activate
-        # Install dependencies only if not cached
-        if [ ! -d ".venv" ]; then
-          pip install -r requirements.txt
-          pip install -r dev-requirements.txt
-        fi
+        pip install -r requirements.txt
+        pip install -r dev-requirements.txt
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
