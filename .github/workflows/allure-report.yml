@@ -16,19 +16,23 @@ jobs:
       with:
         python-version: 3.12.4
 
-    - uses: actions/cache@v2
-      id: cache-venv
+    - name: Cache Python packages
+      uses: actions/cache@v3
       with:
         path: ./.venv/
         key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
           ${{ runner.os }}-venv-
 
-    - name: Run Python tests
-      run: python -m venv ./.venv && . ./.venv/bin/activate && 
-           pip install -r requirements.txt &&
-           pip install -r dev-requirements.txt
-      if: steps.cache-venv.outputs.cache-hit != 'true'
+    - name: Create and activate virtual environment
+      run: |
+        python -m venv .venv
+        . .venv/bin/activate
+        # Install dependencies only if not cached
+        if [ ! -d ".venv" ]; then
+          pip install -r requirements.txt
+          pip install -r dev-requirements.txt
+        fi
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
@@ -42,7 +46,7 @@ jobs:
 
     - name: Run tests and generate allure-results
       run: |
-        . ./.venv/bin/activate && pytest --alluredir=allure-results
+        . .venv/bin/activate && pytest --alluredir=allure-results
 
     - name: Generate Allure report
       run: |
