@@ -56,7 +56,7 @@ def generate_allure_report():
         except subprocess.CalledProcessError as e:
             print(f"Failed to generate Allure report. Error: {str(e)}")
         finally:
-            shutil.rmtree(ALLURE_RESULTS_DIR)
+            # shutil.rmtree(ALLURE_RESULTS_DIR)
             print(f"Cleaned up '{ALLURE_RESULTS_DIR}' directory.")
     else:
         print(
