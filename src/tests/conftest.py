@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import subprocess
 
@@ -19,6 +20,7 @@ def check_env_vars(env_vars):
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
+    sys.path.append("./src")
     if not os.path.exists(ALLURE_RESULTS_DIR):
         os.makedirs(ALLURE_RESULTS_DIR)
     config.option.allure_report_dir = ALLURE_RESULTS_DIR
