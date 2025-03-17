@@ -1,10 +1,8 @@
-import os
-import difflib
 import logging
 import re
 from enum import Enum
 from json import dumps
-from typing import List, Union, Optional
+from typing import Any, List, Union, Optional
 
 from azure.devops.v7_0.git.git_client import GitClient
 from azure.devops.v7_0.git.models import (
@@ -26,19 +24,6 @@ from ..utils import extract_old_new_pairs, generate_diff
 from ...elitea_base import BaseToolApiWrapper
 
 logger = logging.getLogger(__name__)
-
-
-class EnvVars(Enum):
-    ORGANIZATION_URL = "ADO_REPOS_ORGANIZATION_URL"
-    PROJECT = "ADO_REPOS_PROJECT"
-    REPOSITORY_ID = "ADO_REPOS_REPOSITORY_ID"
-    BASE_BRANCH = "ADO_REPOS_BASE_BRANCH"
-    ACTIVE_BRANCH = "ADO_REPOS_ACTIVE_BRANCH"
-    TOKEN = "ADO_REPOS_TOKEN"
-
-    def get_value(self):
-        """Utility method to fetch the environment variable for the enum value."""
-        return os.getenv(self.value)
 
 
 class GitChange:
@@ -188,6 +173,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
     repository_id: Optional[str]
     base_branch: Optional[str]
     active_branch: Optional[str]
+    token: Optional[str]
     _client: Optional[GitClient] = PrivateAttr()
 
     class Config:
@@ -563,7 +549,7 @@ class ReposApiWrapper(BaseToolApiWrapper):
         new_branch_name = branch_name
         if bool(re.search(r"\s", new_branch_name)):
             return (
-                f"Branch '{new_branch_name}' contains spaces."
+                f"Branch '{new_branch_name}' contains spaces. "
                 "Please remove them or use special characters"
             )
 
@@ -1001,25 +987,6 @@ class ReposApiWrapper(BaseToolApiWrapper):
                 "args_schema": ArgsSchema.CreatePullRequest.value,
             },
         ]
-
-    @classmethod
-    def from_env(cls, **overrides):
-        env_values = {
-            "organization_url": EnvVars.ORGANIZATION_URL.get_value(),
-            "project": EnvVars.PROJECT.get_value(),
-            "repository_id": EnvVars.REPOSITORY_ID.get_value(),
-            "base_branch": EnvVars.BASE_BRANCH.get_value(),
-            "active_branch": EnvVars.ACTIVE_BRANCH.get_value(),
-            "token": EnvVars.TOKEN.get_value()
-        }
-
-        effective_values = {**env_values, **overrides}
-        
-        missing = [k for k, v in effective_values.items() if v is None]
-        if missing:
-            raise EnvironmentError(f"Missing essential configurations: {', '.join(missing)}")
-        
-        return cls(**effective_values)
 
     def run(self, mode: str, *args: Any, **kwargs: Any):
         """Run the tool based on the selected mode."""
