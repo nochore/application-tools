@@ -2,9 +2,6 @@ name: Allure Report Workflow
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   run-tests-and-publish-report:
@@ -24,12 +21,20 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest allure-pytest
 
+    - name: Install Allure CLI
+      run: |
+        wget https://github.com/allure-framework/allure2/releases/download/2.21.0/allure-2.21.0.tgz
+        tar -xzf allure-2.21.0.tgz
+        sudo mv allure-2.21.0 /opt/allure
+        sudo ln -s /opt/allure/bin/allure /usr/bin/allure
+
     - name: Run tests and generate allure-results
       run: |
         pytest --alluredir=allure-results
 
     - name: Generate Allure report
-      run: allure generate allure-results --clean -o docs
+      run: |
+        allure generate allure-results --clean -o docs
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
