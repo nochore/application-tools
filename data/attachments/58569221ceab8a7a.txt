@@ -1,0 +1,1 @@
+2025-03-17 14:02:29 ERROR Branch 'existing-branch' already exists.
