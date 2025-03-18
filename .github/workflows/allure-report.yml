@@ -37,16 +37,15 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        # Run tests with coverage collecting info and generate XML report
-        coverage run -m pytest --alluredir=allure-results
-        coverage report -m
+        . .venv/bin/activate &&
+        coverage run -m pytest --alluredir=allure-results &&
+        coverage report -m &&
         coverage xml
 
     - name: Extract Coverage Percentage
       id: coverage
       run: |
-        # Extract the TOTAL coverage percentage from the coverage report output
-        COVERAGE=$(coverage report | awk '/TOTAL/ {gsub("%", "", $4); print $4}')
+        COVERAGE=$(coverage report | awk '/TOTAL/ {gsub("%", "", $4); print $4}') &&
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
 
     - name: Post Coverage Comment on PR
