@@ -34,7 +34,7 @@ def test_suite_cleanup():
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     print(f"\nTest suite finished.\nExit status: {exitstatus}")
-    generate_allure_report()
+    #generate_allure_report()
 
 
 def generate_allure_report():
