@@ -20,7 +20,9 @@ def check_env_vars(env_vars):
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
-    sys.path.append("./src")
+    abs = os.path.abspath("src")
+    if abs not in sys.path:
+        sys.path.insert(0, abs)
     if not os.path.exists(ALLURE_RESULTS_DIR):
         os.makedirs(ALLURE_RESULTS_DIR)
     config.option.allure_report_dir = ALLURE_RESULTS_DIR
@@ -34,7 +36,7 @@ def test_suite_cleanup():
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     print(f"\nTest suite finished.\nExit status: {exitstatus}")
-    #generate_allure_report()
+    generate_allure_report()
 
 
 def generate_allure_report():
@@ -56,7 +58,7 @@ def generate_allure_report():
         except subprocess.CalledProcessError as e:
             print(f"Failed to generate Allure report. Error: {str(e)}")
         finally:
-            # shutil.rmtree(ALLURE_RESULTS_DIR)
+            shutil.rmtree(ALLURE_RESULTS_DIR)
             print(f"Cleaned up '{ALLURE_RESULTS_DIR}' directory.")
     else:
         print(

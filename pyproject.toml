@@ -30,7 +30,7 @@ minversion = "8.3.4"
 addopts = """
         -v -ra -q -p no:warnings 
         --ignore=src/alita_tools/ado/test_plan 
-        --rootdir=src --alluredir=allure-results
+        --rootdir=./src --alluredir=allure-results
         src/tests/
         """
 log_cli = true
@@ -45,3 +45,25 @@ testpaths = [
     "tests",
     "tests/ado"
 ]
+markers = [
+    "unit: marks tests as unit (deselect with '-m \"not unit\"')",
+    "positive: marks positive tests",
+    "negative: marks negative tests",
+    "ado_repos: marks ADO Repos tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "*/__init__.py",
+    "*/tests/*",
+    "model.py",
+    "*constants.py",
+    ]
+
+[tool.coverage.report]
+omit = [
+    "*/__init__.py",
+    "*/tests/*",
+    "model.py",
+    "*constants.py",
+    ]
