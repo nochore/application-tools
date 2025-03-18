@@ -27,7 +27,13 @@ file = [ "requirements.txt",]
 
 [tool.pytest.ini_options]
 minversion = "8.3.4"
-addopts = "-v -ra -q -p no:warnings --ignore=src/alita_tools/ado/test_plan --rootdir=src --alluredir=allure-results"
+addopts = """
+        --cov-report term-missing --cov-branch --cov-report html --cov-report term
+        --cov=. --cov-context=test
+        -v -ra -q -p no:warnings 
+        --ignore=src/alita_tools/ado/test_plan 
+        --rootdir=src --alluredir=allure-results
+        """
 log_cli = true
 log_cli_level = "INFO"
 log_format = "%(asctime)s %(levelname)s %(message)s"
