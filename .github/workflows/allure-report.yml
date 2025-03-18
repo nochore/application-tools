@@ -42,11 +42,10 @@ jobs:
         coverage report -m &&
         coverage xml
 
-    - name: Extract Coverage Percentage
-      id: coverage
-      run: |
-        COVERAGE=$(coverage report | awk '/TOTAL/ {gsub("%", "", $4); print $4}') &&
-        echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+    - name: Make PR with coverage
+      uses: ewjoachim/coverage-comment-action@v1
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Post Coverage Comment on PR
       if: ${{ github.event_name == 'pull_request' }}
@@ -63,7 +62,6 @@ jobs:
       if: always()
       with:
         allure_results: allure-results
-        keep_reports: 3
 
     - name: Deploy Allure Report to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
