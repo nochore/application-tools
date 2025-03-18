@@ -17,9 +17,9 @@ on:
   #   branches: [ master, main ]
   workflow_dispatch:
 
-permissions:
-  pull-requests: write
-  contents: write
+# permissions:
+#   pull-requests: write
+#   contents: write
 
 jobs:
   matrix-build:
@@ -55,7 +55,7 @@ jobs:
         run: ${{ env.PYTEST_CMD }}
 
   primary-build:
-    runs-on: ${{ env.PRIMARY_PLATFORM }}
+    runs-on: ubuntu-latest
     concurrency:
       group: github-pages
       cancel-in-progress: false
