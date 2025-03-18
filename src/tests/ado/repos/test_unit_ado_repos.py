@@ -1353,6 +1353,7 @@ class TestReposApiWrapper:
 
     @pytest.mark.unit
     @pytest.mark.negative
+    @pytest.mark.new
     def test_run_tool_unknown_mode(self, repos_wrapper):
         mode = "unknown_mode"
         with pytest.raises(ValueError) as exception:
