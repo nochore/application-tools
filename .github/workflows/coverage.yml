@@ -2,9 +2,10 @@ name: Post coverage comment
 
 on:
   workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
+      workflows: ["Allure Report Workflow"]
+      types:
+        - completed
+  workflow_dispatch:
 
 jobs:
   test:
