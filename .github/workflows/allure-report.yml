@@ -19,13 +19,14 @@ jobs:
     - name: Cache pip packages
       uses: actions/cache@v3
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        path: ./.venv/
+        key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-venv-
 
     - name: Install dependencies
       run: |
+        python -m venv ./.venv && . ./.venv/bin/activate &&
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r dev-requirements.txt
@@ -33,9 +34,6 @@ jobs:
 
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
-
-    - name: Run pytest & generate Allure results
-      run: pytest --alluredir=allure-results
 
     - name: Run tests with coverage
       run: |
@@ -61,10 +59,12 @@ jobs:
           Detailed report available in [coverage.xml](./coverage.xml).
 
     - name: Generate Allure Report
-      uses: andgineer/allure-report@v3.5
+      uses: simple-elf/allure-report-action@master
       id: allure-report
+      if: always()
       with:
         allure-results: allure-results
+        keep_reports: 3
 
     - name: Deploy Allure Report to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
