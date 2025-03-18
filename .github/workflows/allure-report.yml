@@ -1,3 +1,13 @@
+name: Allure Report Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-tests-and-publish-report:
+    runs-on: ubuntu-latest
+
+  steps:
   - name: Checkout code
     uses: actions/checkout@v3
 
