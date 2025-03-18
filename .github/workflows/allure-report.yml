@@ -41,6 +41,13 @@ jobs:
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
 
+    - name: Configure Coverage to use Relative Paths
+      run: |
+        cat > .coveragerc <<EOF
+        [run]
+        relative_files = True
+        EOF
+
     - name: Run tests with coverage
       run: |
         . .venv/bin/activate &&

@@ -1246,6 +1246,7 @@ class TestReposApiWrapper:
 
     @pytest.mark.unit
     @pytest.mark.negative
+    @pytest.mark.new
     @patch("alita_tools.ado.repos.repos_wrapper.logger")
     def test_comment_on_pull_request_failure(
         self, mock_logger, repos_wrapper, mock_git_client
@@ -1263,6 +1264,7 @@ class TestReposApiWrapper:
 
     @pytest.mark.unit
     @pytest.mark.positive
+    @pytest.mark.new
     def test_create_pr_success(self, repos_wrapper, mock_git_client):
         pull_request_title = "Add new feature"
         pull_request_body = "Description of the new feature"
@@ -1306,6 +1308,7 @@ class TestReposApiWrapper:
 
     @pytest.mark.unit
     @pytest.mark.negative
+    @pytest.mark.new
     @patch("alita_tools.ado.repos.repos_wrapper.logger")
     def test_create_pr_failure(self, mock_logger, repos_wrapper, mock_git_client):
         pull_request_title = "Enhance feature"
@@ -1325,6 +1328,7 @@ class TestReposApiWrapper:
 
     @pytest.mark.unit
     @pytest.mark.positive
+    @pytest.mark.new
     @pytest.mark.parametrize(
         "mode,expected_ref",
         [
