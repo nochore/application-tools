@@ -53,6 +53,7 @@ markers = [
 ]
 
 [tool.coverage.run]
+dynamic_context = "test_function"
 omit = [
     "*/__init__.py",
     "*/tests/*",
