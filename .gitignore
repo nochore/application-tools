@@ -1,7 +1,8 @@
+docs/*
 .idea/*
 .venv/*
-docs/*
 .vscode/*
+allure-report/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
