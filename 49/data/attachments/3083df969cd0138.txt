@@ -1,0 +1,2 @@
+2025-03-20 10:58:48 INFO wiki name 'test-wiki-id' doesn't exist. New wiki will be created.
+2025-03-20 10:58:48 ERROR Unable to modify wiki page: WikiPageCreateOrUpdateParameters.__init__() got an unexpected keyword argument 'name'
