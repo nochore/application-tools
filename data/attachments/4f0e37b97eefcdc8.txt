@@ -1,0 +1,1 @@
+2025-03-20 10:21:01 ERROR Error during the attempt to extract wiki page: 'NoneType' object has no attribute 'strip'
