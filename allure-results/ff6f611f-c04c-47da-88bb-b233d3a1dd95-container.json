@@ -1,1 +1,0 @@
-{"uuid": "d6a93bdc-ae72-4236-a5bc-e09d8610f3bc", "children": ["59c326ac-f3a4-473f-84f9-8094323a29ee"], "befores": [{"name": "mock_git_client", "status": "passed", "start": 1743501665716, "stop": 1743501665717}], "afters": [{"name": "mock_git_client::0", "status": "passed", "start": 1743501665719, "stop": 1743501665719}], "start": 1743501665716, "stop": 1743501665719}

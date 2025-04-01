@@ -1,0 +1,2 @@
+2025-04-01 10:52:08 INFO Search for work items using SELECT [System.Id] FROM WorkItems
+2025-04-01 10:52:08 ERROR Error searching work items: Search Failed
