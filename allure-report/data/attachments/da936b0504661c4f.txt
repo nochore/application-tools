@@ -1,0 +1,1 @@
+2025-04-01 10:57:36 INFO Search for work items using SELECT [System.Id] FROM WorkItems WHERE [System.State] = 'Active'
