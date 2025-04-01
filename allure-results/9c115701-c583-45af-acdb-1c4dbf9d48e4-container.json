@@ -1,1 +1,0 @@
-{"uuid": "ba59af58-b541-4d81-bc36-4b3d4c3fe154", "children": ["7e37c995-e29e-4d6c-bb78-144eafd93ee4"], "befores": [{"name": "mock_connection", "status": "passed", "start": 1743505056438, "stop": 1743505056438}], "afters": [{"name": "mock_connection::0", "status": "passed", "start": 1743505056441, "stop": 1743505056441}], "start": 1743505056438, "stop": 1743505056441}
