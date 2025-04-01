@@ -1,1 +1,0 @@
-{"uuid": "63234503-77b6-4703-b5ac-f2cf34320e47", "children": ["44f92246-d591-4234-876d-c7b6fb1a770d"], "befores": [{"name": "mock_basic_auth", "status": "passed", "start": 1743499571335, "stop": 1743499571335}], "afters": [{"name": "mock_basic_auth::0", "status": "passed", "start": 1743499571337, "stop": 1743499571337}], "start": 1743499571335, "stop": 1743499571337}
