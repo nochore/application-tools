@@ -1,0 +1,2 @@
+2025-04-02 02:25:27 INFO Search for work items using query
+2025-04-02 02:25:27 ERROR Invalid WIQL query: Value Error
