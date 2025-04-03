@@ -255,46 +255,42 @@ class FigmaApiWrapper(BaseToolApiWrapper):
             response = requests.request(method, url, headers=headers, json=payload)
             response.raise_for_status()
             return response
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             msg = f"HTTP request failed: {e}"
             logging.error(msg)
             raise ToolException(msg)
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_toolkit(cls, values):
-        token = values.token
-        oauth2 = values.oauth2
-        global_regexp = values.global_regexp
-
-        if global_regexp is None:
-            logging.warning("No regex pattern provided. Skipping regex compilation.")
-            cls.global_regexp = None
-        else:
+    def validate_toolkit(self):
+        if hasattr(self, '_client'):  # Skip if already initialized
+            return self
+            
+        if self.global_regexp is not None:
             try:
-                re.compile(global_regexp)
-                cls.global_regexp = global_regexp
+                re.compile(self.global_regexp)
             except re.error as e:
                 msg = f"Failed to compile regex pattern: {str(e)}"
                 logging.error(msg)
-                return ToolException(msg)
+                raise ToolException(msg)
+        else:
+            logging.warning("No regex pattern provided. Skipping regex compilation.")
 
         try:
-            if token:
-                cls._client = FigmaPy(token=token, oauth2=False)
+            if self.token:
+                self._client = FigmaPy(token=self.token, oauth2=False)
                 logging.info("Authenticated with Figma token")
-            elif oauth2:
-                cls._client = FigmaPy(token=oauth2, oauth2=True)
+            elif self.oauth2:
+                self._client = FigmaPy(token=self.oauth2, oauth2=True)
                 logging.info("Authenticated with OAuth2 token")
             else:
-                return ToolException("You have to define Figma token.")
+                raise ToolException("You have to define Figma token.")
             logging.info("Successfully authenticated to Figma.")
         except Exception as e:
             msg = f"Failed to authenticate with Figma: {str(e)}"
             logging.error(msg)
-            return ToolException(msg)
+            raise ToolException(msg)
 
-        return values
+        return self
 
     @staticmethod
     def process_output(func):
