@@ -1,4 +1,5 @@
 import logging
+import requests
 from typing import Any, Optional
 
 import pymupdf
@@ -86,22 +87,26 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         Returns content of the report.
         """
         format: str = 'html'
-        response = self._client.export_specified_launch(launch_id, format)
+        try:
+            response = self._client.export_specified_launch(launch_id, format)
 
-        if not response.headers['Content-Disposition']:
-            logger.warning(f"Exported data for launch {launch_id} is empty.")
-            return None
+            if not response.headers['Content-Disposition']:
+                logger.warning(f"Exported data for launch {launch_id} is empty.")
+                return None
 
-        if response.headers['Content-Type'] in ['application/pdf', 'text/html']:
-            with pymupdf.open(stream=response.content, filetype=format) as report:
-                text_content = ''
-                for page_num in range(len(report)):
-                    page = report[page_num]
-                    text_content += page.get_text()
+            if response.headers['Content-Type'] in ['application/pdf', 'text/html']:
+                with pymupdf.open(stream=response.content, filetype=format) as report:
+                    text_content = ''
+                    for page_num in range(len(report)):
+                        page = report[page_num]
+                        text_content += page.get_text()
 
-                return text_content
-        else:
-            logger.warning(f"Exported data for launch {launch_id} is in an unsupported format.")
+                    return text_content
+            else:
+                logger.warning(f"Exported data for launch {launch_id} is in an unsupported format.")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get extended launch data: {e}")
             return None
 
     def get_launch_details(self, launch_id: str) -> dict:
@@ -110,7 +115,10 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         By analyzing the launch details, the AI can identify patterns in test failures and suggest areas
         of the application that may require additional attention or testing.
         """
-        return self._client.get_launch_details(launch_id)
+        try:
+            return self._client.get_launch_details(launch_id)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_all_launches(self, page_number: int = 1) -> dict:
         """
@@ -119,7 +127,10 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         stability, and the impact of new code changes on the overall quality.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self._client.get_all_launches(page_number)
+        try:
+            return self._client.get_all_launches(page_number)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def find_test_item_by_id(self, item_id: str) -> dict:
         """
@@ -127,7 +138,10 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         the historical performance of the test, identify flaky tests, and suggest improvements
         or optimizations to the test suite.
         """
-        return self._client.find_test_item_by_id(item_id)
+        try:
+            return self._client.find_test_item_by_id(item_id)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_test_items_for_launch(self, launch_id: str, page_number: int = 1) -> dict:
         """
@@ -136,7 +150,10 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         and provide recommendations for test prioritization in future test cycles.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self._client.get_test_items_for_launch(launch_id, page_number)
+        try:
+            return self._client.get_test_items_for_launch(launch_id, page_number)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_logs_for_test_items(self, item_id: str, page_number: int = 1) -> dict:
         """
@@ -145,14 +162,20 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         correlate errors with source code changes, and assist developers in pinpointing issues.
         if page.totalPages > 1, you can use page_number to get the next page.
         """
-        return self._client.get_logs_for_test_items(item_id, page_number)
+        try:
+            return self._client.get_logs_for_test_items(item_id, page_number)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_user_information(self, username: str) -> dict:
         """
         Use user information to personalize dashboards and reports. It can also analyze user activity to optimize
         test assignment and load balancing among QA team members based on their expertise and past performance.
         """
-        return self._client.get_user_information(username)
+        try:
+            return self._client.get_user_information(username)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_dashboard_data(self, dashboard_id: str) -> dict:
         """
@@ -160,7 +183,10 @@ class ReportPortalApiWrapper(BaseToolApiWrapper):
         overall project health, and areas requiring immediate attention.
         It can also provide predictive analytics for future test planning.
         """
-        return self._client.get_dashboard_data(dashboard_id)
+        try:
+            return self._client.get_dashboard_data(dashboard_id)
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
     def get_available_tools(self):
         return [
