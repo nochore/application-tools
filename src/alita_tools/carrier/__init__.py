@@ -43,7 +43,7 @@ class AlitaCarrierToolkit(BaseToolkit):
                 'metadata': {
                     "label": "Carrier",
                     "version": "2.0.1",
-                    "icon_url": "https://getcarrier.io/assets/images/logo.svg",
+                    "icon_url": "carrier.svg",
                     "capabilities": {
                         "total_tools": len(selected_tools),
                         "tool_categories": ["Ticket Management", "Reporting", "Audit Logs"]
@@ -78,6 +78,7 @@ class AlitaCarrierToolkit(BaseToolkit):
                 continue
             try:
                 tool_instance = tool_def['tool'](api_wrapper=carrier_api_wrapper)
+                tool_instance.name = prefix + tool_instance.name
                 tools.append(tool_instance)
                 logger.info(f"[AlitaCarrierToolkit] Successfully initialized tool '{tool_instance.name}'")
             except Exception as e:
