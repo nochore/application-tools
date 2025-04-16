@@ -36,7 +36,7 @@ cache_dir = ".pytest_cache"
 python_files = "test_*.py"
 python_functions = "test_"
 testpaths = [ "tests",]
-markers = [ 
+markers = [
     "dependency: marks dependency from other tests",
     "unit: marks tests as unit (deselect with '-m \"not unit\"')",
     "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
@@ -45,17 +45,18 @@ markers = [
     "positive: marks positive tests",
     "negative: marks negative tests",
     "exception_handling: marks exception handling with logger tests",
-    "utils: marks utils tests", 
-    "ado: marks Azure DevOps tests", 
-    "ado_repos: marks Azure DevOps Repos tests", 
-    "ado_test_plan: marks Azure DevOps Test Plan tests", 
-    "ado_wiki: marks Azure DevOps Wiki tests", 
-    "gitlab: marks Gitlab tests", 
-    "sharepoint: marks Sharepoint tests", 
-    "azureai: marks Azure AI tests", 
-    "qtest: marks QTest tests", 
+    "utils: marks utils tests",
+    "ado: marks Azure DevOps tests",
+    "ado_repos: marks Azure DevOps Repos tests",
+    "ado_test_plan: marks Azure DevOps Test Plan tests",
+    "ado_wiki: marks Azure DevOps Wiki tests",
+    "gitlab: marks Gitlab tests",
+    "sharepoint: marks Sharepoint tests",
+    "azureai: marks Azure AI tests",
+    "qtest: marks QTest tests",
     "figma: marks Figma tests",
-    "report_portal: marks report_portal tests"
+    "report_portal: marks report_portal tests",
+    "browser: marks Browser tests",
     ]
 
 [tool.coverage.run]

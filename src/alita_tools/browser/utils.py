@@ -37,9 +37,19 @@ def webRag(urls, max_response_size, query):
     docs = db.search(query, "mmr", k=10)
     text = ""
     for doc in docs:
-        text += f"\n\n{doc.page_content}"
-        if len(text) > max_response_size:
-            break
+        # Check if adding the next doc would exceed the limit
+        next_chunk = f"\n\n{doc.page_content}"
+        if len(text) + len(next_chunk) > max_response_size:
+            # If adding the whole chunk exceeds, try adding a truncated part
+            remaining_space = max_response_size - len(text)
+            if remaining_space > 2: # Need space for at least "\n\n"
+                 text += next_chunk[:remaining_space]
+            break # Stop adding more docs
+        else:
+             text += next_chunk
+
+    # Ensure final text does not exceed max_response_size (optional safeguard)
+    # return text[:max_response_size]
     return text
 
 

@@ -17,11 +17,39 @@ class SingleURLCrawler(BaseTool):
     args_schema = CrawlerModel
 
     def _run(self, url: str, run_manager=None):
-        for doc in get_page([url]):
-            text = doc.page_content
-            if len(text) > self.max_response_size:
-                break
-        return text
+        docs = get_page([url])
+        content_parts = []
+        current_length = 0
+        separator = "\n\n"
+        separator_len = len(separator)
+
+        for i, doc in enumerate(docs):
+            doc_content = doc.page_content
+            doc_len = len(doc_content)
+            # Determine if separator is needed (not for the first part)
+            needed_separator_len = separator_len if i > 0 else 0
+
+            # Check if adding the next part (with separator) exceeds the limit
+            if current_length + needed_separator_len + doc_len > self.max_response_size:
+                remaining_space = self.max_response_size - current_length
+                # Can we fit the separator and at least one character?
+                if remaining_space > needed_separator_len:
+                    if i > 0: # Add separator if not the first part
+                        content_parts.append(separator)
+                    # Add the truncated content
+                    content_parts.append(doc_content[:remaining_space - needed_separator_len])
+                # If only separator fits or less, we add nothing more.
+                break # Stop processing further documents
+            else:
+                # Add separator if not the first part
+                if i > 0:
+                    content_parts.append(separator)
+                    current_length += separator_len
+                # Add the full document content
+                content_parts.append(doc_content)
+                current_length += doc_len
+
+        return "".join(content_parts)
 
 class MultiURLCrawler(BaseTool):
     max_response_size: int = 3000
