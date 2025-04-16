@@ -1,4 +1,4 @@
-import requests
+# import requests
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -234,9 +234,9 @@ class TestWikiApiWrapperPositive:
             error_message = "The version '{0}' either is invalid or does not exist."
             simulated_error = AzureDevOpsServiceError(error_message)
             # Mock the inner exception structure expected by some handlers
-            mock_response = requests.Response()
-            mock_response.status_code = 400
-            simulated_error.inner_exception = requests.exceptions.HTTPError(response=mock_response)
+            # mock_response = requests.Response()
+            # mock_response.status_code = 400
+            # simulated_error.inner_exception = requests.exceptions.HTTPError(response=mock_response)
 
             mock_create_page_move.side_effect = [
                 simulated_error,  # Raise the specific error on the first call
@@ -334,9 +334,9 @@ class TestWikiApiWrapperPositive:
             error_message = "The version '{0}' either is invalid or does not exist."
             simulated_error = AzureDevOpsServiceError(error_message)
             # Mock the inner exception structure expected by some handlers
-            mock_response = requests.Response()
-            mock_response.status_code = 400
-            simulated_error.inner_exception = requests.exceptions.HTTPError(response=mock_response)
+            # mock_response = requests.Response()
+            # mock_response.status_code = 400
+            # simulated_error.inner_exception = requests.exceptions.HTTPError(response=mock_response)
 
             mock_create_or_update_page.side_effect = [
                 simulated_error,  # Raise the specific error on the first call

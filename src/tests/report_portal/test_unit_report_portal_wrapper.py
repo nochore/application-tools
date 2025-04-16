@@ -1,7 +1,8 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 import pytest
 import requests
+import pymupdf # Added import
 from src.alita_tools.report_portal.api_wrapper import ReportPortalApiWrapper
 from src.alita_tools.report_portal.report_portal_client import RPClient
 
@@ -93,6 +94,62 @@ class TestReportPortalWrapper:
         result = rp_wrapper.get_extended_launch_data_as_raw(launch_id)
         
         assert result is None
+        rp_wrapper._client.export_specified_launch.assert_called_once_with(launch_id, 'html')
+
+    @pytest.mark.positive
+    @patch('src.alita_tools.report_portal.api_wrapper.pymupdf.open')
+    def test_get_extended_launch_data_html_success(self, mock_pymupdf_open, rp_wrapper, mock_response):
+        """Test getting extended launch data with HTML content successfully."""
+        launch_id = "123"
+        mock_response.headers['Content-Type'] = 'text/html'
+        rp_wrapper._client.export_specified_launch.return_value = mock_response
+
+        # Mock pymupdf behavior
+        mock_doc = MagicMock()
+        mock_page1 = MagicMock()
+        mock_page1.get_text.return_value = "Page 1 text "
+        mock_page2 = MagicMock()
+        mock_page2.get_text.return_value = "Page 2 text"
+        mock_doc.__len__.return_value = 2
+        mock_doc.__getitem__.side_effect = [mock_page1, mock_page2]
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
+
+        result = rp_wrapper.get_extended_launch_data(launch_id)
+
+        assert result == "Page 1 text Page 2 text"
+        rp_wrapper._client.export_specified_launch.assert_called_once_with(launch_id, 'html')
+        mock_pymupdf_open.assert_called_once_with(stream=mock_response.content, filetype='html')
+        assert mock_doc.__getitem__.call_count == 2
+        mock_page1.get_text.assert_called_once()
+        mock_page2.get_text.assert_called_once()
+
+    @pytest.mark.positive
+    @patch('src.alita_tools.report_portal.api_wrapper.pymupdf.open')
+    def test_get_extended_launch_data_pdf_success(self, mock_pymupdf_open, rp_wrapper, mock_response):
+        """Test getting extended launch data with PDF content successfully."""
+        launch_id = "123"
+        mock_response.headers['Content-Type'] = 'application/pdf'
+        # Simulate calling with pdf format, although default is html, the code uses 'html' internally
+        # This test ensures the pdf content type is handled correctly by pymupdf branch
+        rp_wrapper._client.export_specified_launch.return_value = mock_response
+
+        # Mock pymupdf behavior
+        mock_doc = MagicMock()
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = "PDF text content"
+        mock_doc.__len__.return_value = 1
+        mock_doc.__getitem__.return_value = mock_page
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
+
+        result = rp_wrapper.get_extended_launch_data(launch_id)
+
+        assert result == "PDF text content"
+        # Note: The internal format variable is hardcoded to 'html' in the tested function
+        rp_wrapper._client.export_specified_launch.assert_called_once_with(launch_id, 'html')
+        mock_pymupdf_open.assert_called_once_with(stream=mock_response.content, filetype='html')
+        mock_doc.__getitem__.assert_called_once_with(0)
+        mock_page.get_text.assert_called_once()
+
 
     @pytest.mark.positive
     def test_get_launch_details_success(self, rp_wrapper, mock_response):
