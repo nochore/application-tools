@@ -1008,7 +1008,7 @@ class TestReposToolsPositive:
             result
             == f"Branch '{branch_name}' created successfully, and set as current active branch."
         )
-        assert mock_git_client.get_branch.call_count == 4 # Check existing, get base, check existing again, get base again? Seems excessive, but matches code.
+        assert mock_git_client.get_branch.call_count == 2
         mock_git_client.update_refs.assert_called_once()
 
     def test_create_branch_fallback_to_base(self, repos_wrapper, mock_git_client):

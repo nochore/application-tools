@@ -339,6 +339,11 @@ class FigmaApiWrapper(BaseToolApiWrapper):
             try:
                 limit = int(limit)
                 result = func(self, *args, **kwargs)
+
+                # If the wrapped function already returned a ToolException, pass it through
+                if isinstance(result, ToolException):
+                    return result
+
                 if result and "__dict__" in dir(result):
                     result = result.__dict__
                 elif not result:
