@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 import requests
+from requests.utils import quote # Add import for quote
 from langchain_core.tools import ToolException
 from pydantic import PrivateAttr
 
@@ -82,7 +83,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
             else:
                 return f"Unexpected response format: {response_data}"
 
-        except requests.exceptions.JSONDecodeError:
+        except json.JSONDecodeError: # Use json.JSONDecodeError
             return f"No JSON response from Salesforce. HTTP Status: {response.status_code}"
 
 
@@ -142,7 +143,8 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
         """
         Perform a SOQL search in Salesforce.
         """
-        url = f"{self.base_url}/services/data/{self.api_version}/query?q={query}"
+        encoded_query = quote(query) # URL-encode the query
+        url = f"{self.base_url}/services/data/{self.api_version}/query?q={encoded_query}"
         response = requests.get(url, headers=self._headers())
 
         if response.status_code >= 400:
@@ -152,7 +154,7 @@ class SalesforceApiWrapper(BaseToolApiWrapper):
                     error_messages = "; ".join(error.get("message", "Unknown error") for error in errors)
                 else:
                     error_messages = errors.get("message", "Unknown error")
-            except requests.exceptions.JSONDecodeError:
+            except json.JSONDecodeError: # Use json.JSONDecodeError
                 return ToolException(f"Failed to execute SOQL query. No JSON response. Status: {response.status_code}")
 
             return ToolException(f"Failed to execute SOQL query. Errors: {error_messages}")

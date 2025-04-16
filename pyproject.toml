@@ -57,6 +57,7 @@ markers = [
     "figma: marks Figma tests",
     "report_portal: marks report_portal tests",
     "browser: marks Browser tests",
+    "salesforce: marks Salesforce tests"
     ]
 
 [tool.coverage.run]
