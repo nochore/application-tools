@@ -37,14 +37,25 @@ class SharepointAuthorizationHelper:
             return None
 
     def get_access_token(self) -> str:
-        if (self.is_token_valid(self.token_json)):
-            return self.token_json['access_token']
+        # Check the current access_token, not the refresh token (token_json)
+        if self.access_token and self.is_token_valid(self.access_token):
+            return self.access_token
         else:
-            return self.refresh_access_token()
+            # If invalid or missing, refresh it
+            new_token = self.refresh_access_token()
+            self.access_token = new_token # Store the new token
+            return new_token
 
 
     def is_token_valid(self, access_token) -> bool:
+        # Handle None input gracefully
+        if not access_token:
+            return False
         try:
+            # Ensure access_token is a string before decoding
+            if not isinstance(access_token, str):
+                 # Or log an error, depending on expected input types
+                return False
             decoded_token = jwt.decode(access_token, options={"verify_signature": False})
             exp_timestamp = decoded_token.get("exp")
             if exp_timestamp is None:

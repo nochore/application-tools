@@ -10,5 +10,7 @@ def read_docx_from_bytes(file_content):
             text.append(paragraph.text)
         return '\n'.join(text)
     except Exception as e:
-        print(f"Error reading .docx from bytes: {e}")
+        # Use logging instead of print to be captured by caplog in tests
+        import logging
+        logging.error(f"Error reading .docx from bytes: {e}")
         return ""

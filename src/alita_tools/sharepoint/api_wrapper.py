@@ -54,28 +54,38 @@ class SharepointApiWrapper(BaseToolApiWrapper):
         client_id = values.get('client_id')
         client_secret = values.get('client_secret')
         token = values.get('token')
+        _client = None
+
+        if not ((client_id and client_secret) or token):
+            raise ToolException("You have to define token or client id&secret.")
 
         try:
             if client_id and client_secret:
                 credentials = ClientCredential(client_id, client_secret)
-                cls._client = ClientContext(site_url).with_credentials(credentials)
-                logging.info("Authenticated with secret id")
+                _client = ClientContext(site_url).with_credentials(credentials)
+                logging.info("SharePoint: Authenticated with client id/secret.")
             elif token:
-                cls._client = ClientContext(site_url).with_access_token(lambda: type('Token', (), {
-                    'tokenType': 'Bearer',
-                    'accessToken': token
-                })())
-                logging.info("Authenticated with token")
-            else:
-                raise ToolException("You have to define token or client id&secret.")
-            logging.info("Successfully authenticated to SharePoint.")
+                def _acquire_token():
+                    return type('Token', (), {'tokenType': 'Bearer', 'accessToken': token})()
+                _client = ClientContext(site_url).with_access_token(_acquire_token)
+                logging.info("SharePoint: Authenticated with token.")
+
+            values['_client'] = _client
+            logging.info("SharePoint: Authentication successful and client assigned.")
+
         except Exception as e:
-                logging.error(f"Failed to authenticate with SharePoint: {str(e)}")
+            logging.error(f"Failed to authenticate with SharePoint or create client: {str(e)}")
+            values['_client'] = None
+
         return values
 
 
     def read_list(self, list_title, limit: int = 1000):
         """ Reads a specified List in sharepoint site. Number of list items is limited by limit (default is 1000). """
+        if not self._client:
+            logging.error("SharePoint client is not initialized")
+            return ToolException("Can not list items. SharePoint client is not initialized.")
+
         try:
             target_list = self._client.web.lists.get_by_title(list_title)
             self._client.load(target_list)
@@ -93,6 +103,10 @@ class SharepointApiWrapper(BaseToolApiWrapper):
 
     def get_files_list(self, folder_name: str = None, limit_files: int = 100):
         """ If folder name is specified, lists all files in this folder under Shared Documents path. If folder name is empty, lists all files under root catalog (Shared Documents). Number of files is limited by limit_files (default is 100)."""
+        if not self._client:
+            logging.error("SharePoint client is not initialized")
+            return ToolException("Can not get files. SharePoint client is not initialized.")
+
         try:
             result = []
 
@@ -112,33 +126,47 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                     'Link': file.properties['LinkingUrl']
                 }
                 result.append(temp_props)
-            return result if result else ToolException("Can not get files or folder is empty. Please, double check folder name and read permissions.")
+
+            # Return empty list instead of exception when no files found
+            return result
         except Exception as e:
             logging.error(f"Failed to load files from sharepoint: {e}")
             return ToolException("Can not get files. Please, double check folder name and read permissions.")
 
     def read_file(self, path):
         """ Reads file located at the specified server-relative path. """
+        if not self._client:
+            logging.error("SharePoint client is not initialized")
+            return ToolException("File not found. SharePoint client is not initialized.")
+
         try:
             file = self._client.web.get_file_by_server_relative_path(path)
             self._client.load(file).execute_query()
 
             file_content = file.read()
             self._client.execute_query()
-        except Exception as e:
-            logging.error(f"Failed to load file from SharePoint: {e}. Path: {path}. Please, double check file name and path.")
-            return ToolException("File not found. Please, check file name and path.")
 
-        if file.name.endswith('.txt'):
-            try:
-                file_content_str = file_content.decode('utf-8')
-            except Exception as e:
-                logging.error(f"Error decoding file content: {e}")
-        elif file.name.endswith('.docx'):
-            file_content_str = read_docx_from_bytes(file_content)
-        else:
-            return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
-        return file_content_str
+            file_content_str = None # Initialize
+            if file.name.endswith('.txt'):
+                try:
+                    file_content_str = file_content.decode('utf-8')
+                except UnicodeDecodeError as e:
+                    logging.error(f"Error decoding file content: {e}")
+                    return ToolException("Error processing file content after download.") # Return ToolException
+            elif file.name.endswith('.docx'):
+                # read_docx_from_bytes already handles its errors and logs them
+                file_content_str = read_docx_from_bytes(file_content)
+                if file_content_str == "": # Check if reading docx failed
+                    # Optionally return ToolException if docx reading fails critically
+                    # return ToolException("Error processing DOCX file content after download.")
+                    pass # Or just return the empty string as it does now
+            else:
+                return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
+            return file_content_str
+
+        except Exception as e:
+            logging.error(f"Failed to load file from SharePoint: {e}. Path: {path}")
+            return ToolException("File not found. Please, check file name and path.")
 
     def get_available_tools(self):
         return [
