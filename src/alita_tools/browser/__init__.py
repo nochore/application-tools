@@ -1,7 +1,7 @@
 from typing import List, Optional, Literal
 from langchain_core.tools import BaseTool, BaseToolkit
 
-from pydantic import create_model, BaseModel, ConfigDict, Field
+from pydantic import create_model, BaseModel, ConfigDict, Field, SecretStr
 
 from langchain_community.utilities.google_search import GoogleSearchAPIWrapper
 from langchain_community.utilities.wikipedia import WikipediaAPIWrapper
@@ -9,6 +9,9 @@ from .google_search_rag import GoogleSearchResults
 from .crawler import SingleURLCrawler, MultiURLCrawler, GetHTMLContent, GetPDFContent
 from .wiki import WikipediaQueryRun
 from ..utils import get_max_toolkit_length, clean_string, TOOLKIT_SPLITTER
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 name = "browser"
 
@@ -40,7 +43,7 @@ class BrowserToolkit(BaseToolkit):
             name,
             __config__=ConfigDict(json_schema_extra={'metadata': {"label": "Browser", "icon_url": None}}),
             google_cse_id=(Optional[str], Field(description="Google CSE id", default=None)),
-            google_api_key=(Optional[str], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
+            google_api_key=(Optional[SecretStr], Field(description="Google API key", default=None, json_schema_extra={'secret': True})),
             selected_tools=(List[Literal[tuple(selected_tools)]], Field(default=[], json_schema_extra={'args_schemas': selected_tools})),
         )
 
@@ -75,7 +78,7 @@ class BrowserToolkit(BaseToolkit):
                     )
                     tool_entry = GoogleSearchResults(api_wrapper=google_api_wrapper)
                 except Exception as e:
-                    print(f"Google API Wrapper failed to initialize: {e}")
+                    logger.error(f"Google API Wrapper failed to initialize: {e}")
             elif tool == 'wiki':
                 tool_entry = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
 
