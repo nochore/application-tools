@@ -42,14 +42,15 @@ GetFiles = create_model(
 ReadDocument = create_model(
     "ReadDocument",
     path=(str, Field(description="Contains the server-relative path of a document for reading.")),
-    is_capture_image=(Optional[bool], Field(description="Determines if pictures in the document should be recognized.", default=False))
+    is_capture_image=(Optional[bool], Field(description="Determines is pictures in the document should be recognized.", default=False)),
+    page_number=(Optional[int], Field(description="Specifies which page to read. If it is None, then full document will be read.", default=None))
 )
 
 
 class SharepointApiWrapper(BaseToolApiWrapper):
     """
     A wrapper for SharePoint API operations.
-    
+
     This class provides methods to interact with SharePoint lists, files, and documents.
     It supports authentication via client ID/secret or token.
     """
@@ -105,11 +106,11 @@ class SharepointApiWrapper(BaseToolApiWrapper):
     def read_list(self, list_title: str, limit: int = DEFAULT_LIST_LIMIT) -> Union[List[Dict[str, Any]], ToolException]:
         """
         Reads a specified List in SharePoint site.
-        
+
         Args:
             list_title: Name of the SharePoint list to read
             limit: Maximum number of list items to return (default is 1000)
-            
+
         Returns:
             List of dictionaries containing list item properties or ToolException on error
         """
@@ -123,7 +124,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             self._client.execute_query()
             items = target_list.items.get().top(limit).execute_query()
             logging.info(f"{len(items)} items from SharePoint list '{list_title}' loaded successfully.")
-            
+
             return [item.properties for item in items]
         except Exception as e:
             logging.error(f"Failed to load items from SharePoint list '{list_title}': {e}")
@@ -133,14 +134,14 @@ class SharepointApiWrapper(BaseToolApiWrapper):
     def get_files_list(self, folder_name: Optional[str] = None, limit_files: int = DEFAULT_FILES_LIMIT) -> Union[List[Dict[str, str]], ToolException]:
         """
         Lists files in a SharePoint folder.
-        
+
         If folder name is specified, lists all files in this folder under Shared Documents path.
         If folder name is empty, lists all files under root catalog (Shared Documents).
-        
+
         Args:
             folder_name: Name of the folder to list files from (default is None for root)
             limit_files: Maximum number of files to return (default is 100)
-            
+
         Returns:
             List of dictionaries containing file properties or ToolException on error
         """
@@ -151,7 +152,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
         try:
             result = []
             target_folder_url = f"{SHARED_DOCUMENTS}/{folder_name}" if folder_name else SHARED_DOCUMENTS
-            
+
             files = (self._client.web.get_folder_by_server_relative_path(target_folder_url)
                     .get_files(True)
                     .execute_query())
@@ -159,7 +160,7 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             for file in files:
                 if len(result) >= limit_files:
                     break
-                    
+
                 result.append({
                     'Name': file.properties['Name'],
                     'Path': file.properties['ServerRelativeUrl'],
@@ -174,17 +175,17 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             logging.error(f"Failed to load files from SharePoint folder '{folder_name}': {e}")
             return ToolException("Cannot get files. Please, double check folder name and read permissions.")
 
-    def read_file(self, path: str, is_capture_image: bool = False) -> Union[str, ToolException]:
+    def read_file(self, path: str, is_capture_image: bool = False, page_number: int = None) -> Union[str, ToolException]:
         """
         Reads file located at the specified server-relative path.
-        
+
         Args:
             path: Server-relative path to the file
             is_capture_image: If True, attempts to describe images in PDF and PPTX files
-            
+
         Returns:
             File content as string or ToolException on error
-            
+
         Supports:
             - TXT: Plain text files
             - DOCX: Word documents
@@ -201,13 +202,13 @@ class SharepointApiWrapper(BaseToolApiWrapper):
             self._client.load(file).execute_query()
             file_content = file.read()
             self._client.execute_query()
-            
+
             # Check if file type is supported
             file_extension = self._get_file_extension(file.name)
             if file_extension not in SUPPORTED_FILE_TYPES:
                 supported_types = ", ".join(ext[1:].upper() for ext in SUPPORTED_FILE_TYPES)
                 return ToolException(f"Not supported type of file. Supported types are {supported_types} only.")
-            
+
             # Process file based on its type
             if file_extension == '.txt':
                 return self._process_txt_file(file_content)
@@ -217,109 +218,77 @@ class SharepointApiWrapper(BaseToolApiWrapper):
                 return self._process_pdf_file(file_content, is_capture_image)
             elif file_extension == '.pptx':
                 return self._process_pptx_file(file_content, is_capture_image)
-            
+
         except Exception as e:
             logging.error(f"Failed to load file from SharePoint: {e}. Path: {path}")
             return ToolException("File not found. Please, check file name and path.")
-    
-    def _get_file_extension(self, filename: str) -> str:
-        """Extract file extension from filename (lowercase)"""
-        return filename[filename.rfind('.'):].lower() if '.' in filename else ''
-    
-    def _process_txt_file(self, file_content: bytes) -> Union[str, ToolException]:
-        """Process TXT file content"""
-        try:
-            return file_content.decode('utf-8')
-        except UnicodeDecodeError as e:
-            logging.error(f"Error decoding file content: {e}")
-            return ToolException("Error processing file content after download.")
-    
-    def _process_docx_file(self, file_content: bytes) -> str:
-        """Process DOCX file content"""
-        # read_docx_from_bytes already handles its errors and logs them
-        return read_docx_from_bytes(file_content)
-    
-    def _process_pdf_file(self, file_content: bytes, is_capture_image: bool) -> str:
-        """Process PDF file content with optional image description"""
-        text_content = ''
-        with pymupdf.open(stream=file_content, filetype="pdf") as pdf_doc:
-            for page in pdf_doc:
-                text_content += page.get_text()
-                
-                # Process images if requested
-                if is_capture_image:
-                    images = page.get_images(full=True)
-                    for img in images:
-                        xref = img[0]
-                        base_image = pdf_doc.extract_image(xref)
-                        img_bytes = base_image["image"]
-                        
-                        try:
-                            pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-                            caption = self.describe_image(pil_image)
-                            text_content += caption
-                        except Exception as img_err:
-                            logging.warning(f"Could not process image in PDF: {img_err}")
-                            text_content += "\n[Picture: processing error]\n"
-        
-        return text_content
-    
-    def _process_pptx_file(self, file_content: bytes, is_capture_image: bool) -> str:
-        """Process PPTX file content with optional image description"""
-        text_content = ''
-        prs = Presentation(io.BytesIO(file_content))
-        
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                # Extract text from text frames
-                if shape.has_text_frame:
-                    text_content += shape.text_frame.text + "\n"
-                # Process images if requested
-                elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                    try:
-                        pil_image = Image.open(io.BytesIO(shape.image.blob)).convert("RGB")
-                        caption = self.describe_image(pil_image)
-                        text_content += caption
-                    except Exception as img_err:
-                        logging.warning(f"Could not process image in PPTX: {img_err}")
-                        text_content += "\n[Picture: processing error]\n"
-        
-        return text_content
 
-    def describe_image(self, image: Image.Image) -> str:
-        """
-        Generate caption for an image using BLIP model.
-        
-        Args:
-            image: PIL Image object to describe
-            
-        Returns:
-            String containing the image description in format "[Picture: description]"
-        """
-        # Lazy-load the image processing models to save memory when not needed
-        if self._image_processor is None or self._image_model is None:
+        if file.name.endswith('.txt'):
             try:
-                self._image_processor = BlipProcessor.from_pretrained(BLIP_MODEL_NAME)
-                self._image_model = BlipForConditionalGeneration.from_pretrained(BLIP_MODEL_NAME)
-                logging.info("Image description models loaded successfully")
+                file_content_str = file_content.decode('utf-8')
             except Exception as e:
-                logging.error(f"Failed to load image description models: {e}")
-                return "\n[Picture: description unavailable - model loading failed]\n"
-        
-        try:
-            inputs = self._image_processor(image, return_tensors="pt")
-            out = self._image_model.generate(**inputs)
-            caption = self._image_processor.decode(out[0], skip_special_tokens=True)
-            return f"\n[Picture: {caption}]\n"
-        except Exception as e:
-            logging.error(f"Failed to describe image: {e}")
-            return "\n[Picture: description unavailable]\n"
+                logging.error(f"Error decoding file content: {e}")
+        elif file.name.endswith('.docx'):
+            file_content_str = read_docx_from_bytes(file_content)
+        elif file.name.endswith('.pdf'):
+            with pymupdf.open(stream=file_content, filetype="pdf") as report:
+                text_content = ''
+                if page_number is not None:
+                    page = report.load_page(page_number - 1)
+                    text_content += self.read_pdf_page(report, page, page_number, is_capture_image)
+                else:
+                    for index, page in enumerate(report, start=1):
+                        text_content += self.read_pdf_page(report, page, index, is_capture_image)
+                file_content_str = text_content
+        elif file.name.endswith('.pptx'):
+            prs = Presentation(io.BytesIO(file_content))
+            text_content = ''
+            if page_number is not None:
+                text_content += self.read_pptx_slide(prs.slides[page_number - 1], page_number, is_capture_image)
+            else:
+                for index, slide in enumerate(prs.slides, start=1):
+                    text_content += self.read_pptx_slide(slide, index, is_capture_image)
+            file_content_str = text_content
+        else:
+            return ToolException("Not supported type of files entered. Supported types are TXT and DOCX only.")
+        return file_content_str
 
+    def read_pdf_page(self, report, page, index, is_capture_images):
+        text_content = f'Page: {index}\n'
+        text_content += page.get_text()
+        if is_capture_images:
+            images = page.get_images(full=True)
+            for i, img in enumerate(images):
+                xref = img[0]
+                base_image = report.extract_image(xref)
+                img_bytes = base_image["image"]
+                text_content += self.describe_image(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
+        return text_content
+
+    def read_pptx_slide(self, slide, index, is_capture_image):
+        text_content = f'Slide: {index}\n'
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                text_content += shape.text + "\n"
+            elif is_capture_image and shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                try:
+                    caption = self.describe_image(Image.open(io.BytesIO(shape.image.blob)).convert("RGB"))
+                except:
+                    caption = "\n[Picture: unknown]\n"
+                text_content += caption
+        return text_content
+
+    def describe_image(self, image):
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+        inputs = processor(image, return_tensors="pt")
+        out = model.generate(**inputs)
+        return "\n[Picture: " + processor.decode(out[0], skip_special_tokens=True) + "]\n"
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """
         Returns the list of available tools provided by this wrapper.
-        
+
         Returns:
             List of tool definitions with name, description, schema and reference
         """
