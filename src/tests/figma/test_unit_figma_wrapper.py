@@ -1,10 +1,9 @@
 import json
-import logging
 import requests
 from unittest.mock import MagicMock, patch
+from pydantic import SecretStr
 
 import pytest
-from FigmaPy import FigmaPy
 from langchain_core.tools import ToolException
 
 from src.alita_tools.figma.api_wrapper import FigmaApiWrapper
@@ -60,7 +59,7 @@ class TestFigmaApiWrapper:
 
         assert validated_wrapper._client is mock_client_instance
         # Ensure FigmaPy was not called again during the second validation
-        mock_figmapy.assert_called_once_with(token="mock_token", oauth2=False)
+        mock_figmapy.assert_called_once_with(token=SecretStr("mock_token"), oauth2=False)
 
 
     @pytest.mark.positive
@@ -81,7 +80,7 @@ class TestFigmaApiWrapper:
             oauth2=None
         )
         assert isinstance(wrapper._client, MagicMock)
-        mock_figmapy.assert_called_once_with(token="mock_token", oauth2=False)
+        mock_figmapy.assert_called_once_with(token=SecretStr("mock_token"), oauth2=False)
 
     @pytest.mark.positive
     def test_validate_toolkit_with_oauth2(self, mock_figmapy):
@@ -94,7 +93,7 @@ class TestFigmaApiWrapper:
             global_regexp=None
         )
         assert isinstance(wrapper._client, MagicMock)
-        mock_figmapy.assert_called_once_with(token="mock_oauth2_token", oauth2=True)
+        mock_figmapy.assert_called_once_with(token=SecretStr("mock_oauth2_token"), oauth2=True)
 
     @pytest.mark.negative
     def test_validate_toolkit_no_auth(self):
@@ -138,7 +137,7 @@ class TestFigmaApiWrapper:
             "https://api.figma.com/v1/test",
             headers={
                 "Content-Type": "application/json",
-                "X-Figma-Token": "mock_token",
+                "X-Figma-Token": SecretStr('mock_token'),
                 "X-Custom": "test"
             },
             json={"test": "data"}
@@ -162,7 +161,7 @@ class TestFigmaApiWrapper:
             "https://api.figma.com/v1/test",
             headers={
                 "Content-Type": "application/json",
-                "Authorization": "Bearer mock_oauth_token", # Check OAuth header
+                "Authorization": "Bearer **********", # Check OAuth header
             },
             json=None
         )
@@ -262,7 +261,7 @@ class TestFigmaApiWrapper:
             expected_url, # Use the constructed URL
             headers={
                 "Content-Type": "application/json",
-                "X-Figma-Token": "mock_token"
+                "X-Figma-Token": SecretStr('mock_token')
             },
             json={"message": "Test comment", "client_meta": {"node_id": "1:1"}}
         )
